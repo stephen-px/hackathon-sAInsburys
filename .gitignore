@@ -51,3 +51,5 @@ logs/
 
 # Live database — regenerate with: python sainsburys/data/seed.py
 sainsburys/data/lunch.db
+sainsburys/data/lunch.db-shm
+sainsburys/data/lunch.db-wal
