@@ -3,7 +3,7 @@ import os
 import sys
 import time
 
-from flask import Flask, Response, jsonify, send_file, stream_with_context
+from flask import Flask, Response, jsonify, request, send_file, stream_with_context
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -61,6 +61,15 @@ MOCK_TOTALS = [
     {"week": "07-20", "claimed": 47.30, "wasted":  5.20},
 ]
 
+# Department Battle has no backing table in the schema — it is illustrative only,
+# so it is served solely when mock is explicitly enabled.
+MOCK_DEPARTMENTS = {"Engineering": 32.10, "Operations": 10.80, "Product": 4.40}
+
+# Mock is OPT-IN. By default the dashboard shows real DB data (even when empty)
+# and never substitutes fake data — so an empty/uninitialised DB looks empty, not
+# populated. Set DASHBOARD_MOCK=1 for the wifi-down demo safety net.
+ALLOW_MOCK = os.environ.get("DASHBOARD_MOCK", "0").lower() in ("1", "true", "yes")
+
 
 # ── DB helper ─────────────────────────────────────────────────────────────────
 
@@ -98,12 +107,22 @@ def assets(filename):
 
 # ── REST endpoints ────────────────────────────────────────────────────────────
 
+EMPTY_STATS = {"saved_week": 0, "items_rescued": 0, "pending_orders": 0, "active_claimers": 0}
+
+
+def _stats_fallback():
+    """Served when there is no DB. Mock only if explicitly enabled, else zeros."""
+    data = dict(MOCK_STATS if ALLOW_MOCK else EMPTY_STATS)
+    data["live"] = False   # not real DB data
+    return jsonify(data)
+
+
 @app.route("/api/stats")
 def stats():
     try:
         conn = get_db()
         if conn is None:
-            return jsonify(MOCK_STATS)
+            return _stats_fallback()
         cur = conn.cursor()
         cur.execute("""
             SELECT COALESCE(SUM(value), 0) as saved
@@ -128,9 +147,10 @@ def stats():
         claimers = int(cur.fetchone()[0])
         conn.close()
         return jsonify({"saved_week": saved, "items_rescued": rescued,
-                        "pending_orders": pending, "active_claimers": claimers})
+                        "pending_orders": pending, "active_claimers": claimers,
+                        "live": True})
     except Exception:
-        return jsonify(MOCK_STATS)
+        return _stats_fallback()
 
 
 @app.route("/api/leaderboard")
@@ -138,7 +158,7 @@ def leaderboard():
     try:
         conn = get_db()
         if conn is None:
-            return jsonify(MOCK_LEADERBOARD)
+            return jsonify(MOCK_LEADERBOARD if ALLOW_MOCK else [])
         cur = conn.cursor()
         cur.execute("""
             SELECT e.user_slack_id as slack_id,
@@ -155,24 +175,44 @@ def leaderboard():
         conn.close()
         return jsonify(rows)
     except Exception:
-        return jsonify(MOCK_LEADERBOARD)
+        return jsonify(MOCK_LEADERBOARD if ALLOW_MOCK else [])
+
+
+def _rescue_risk(i):
+    """Deterministic expiry-risk score — mirrors flows.rescue._risk, inlined so
+    /api/rescue never imports the Slack/agents chain (an unrelated import error
+    there used to make this endpoint silently fall back to mock data)."""
+    return (3.0 / (max(i["days_left"], 0) + 0.5)
+            + 0.2 * float(i["price"])
+            + 0.1 * float(i["qty_left"]))
 
 
 @app.route("/api/rescue")
 def rescue():
     # Selections-based model (no inventory lots): same source as /demo-rescue.
+    # Reads store.leftovers() directly — store imports nothing heavy, so a real
+    # (even empty) DB always yields real data, never mock.
     try:
         import store
-        from flows.rescue import _risk
-        items = sorted(store.leftovers(), key=_risk, reverse=True)
+    except Exception:
+        return jsonify(MOCK_RESCUE if ALLOW_MOCK else [])
+    try:
+        items = sorted(store.leftovers(), key=_rescue_risk, reverse=True)
         return jsonify([
             {"id": i["product_id"], "name": i["name"], "days_left": i["days_left"],
              "qty_remaining": i["qty_left"], "price": i["price"],
-             "risk_score": round(_risk(i), 2)}
+             "risk_score": round(_rescue_risk(i), 2)}
             for i in items
         ])
     except Exception:
-        return jsonify(MOCK_RESCUE)
+        return jsonify(MOCK_RESCUE if ALLOW_MOCK else [])
+
+
+@app.route("/api/departments")
+def departments():
+    # No department dimension exists in the schema, so there is no real data to
+    # serve — the Department Battle is illustrative. Empty unless mock is on.
+    return jsonify(MOCK_DEPARTMENTS if ALLOW_MOCK else {})
 
 
 @app.route("/api/basket")
@@ -180,7 +220,7 @@ def basket():
     try:
         conn = get_db()
         if conn is None:
-            return jsonify(MOCK_BASKET)
+            return jsonify(MOCK_BASKET if ALLOW_MOCK else {"week": "", "orders": []})
         cur = conn.cursor()
         cur.execute("""
             SELECT id, week, delivery_date, status
@@ -210,7 +250,7 @@ def basket():
         week = str(orders[0]["delivery_date"])[:10] if orders else str(date.today())
         return jsonify({"week": week, "orders": orders})
     except Exception:
-        return jsonify(MOCK_BASKET)
+        return jsonify(MOCK_BASKET if ALLOW_MOCK else {"week": "", "orders": []})
 
 
 @app.route("/api/totals")
@@ -218,7 +258,7 @@ def totals():
     try:
         conn = get_db()
         if conn is None:
-            return jsonify(MOCK_TOTALS)
+            return jsonify(MOCK_TOTALS if ALLOW_MOCK else [])
         cur = conn.cursor()
         cur.execute("""
             SELECT
@@ -234,7 +274,38 @@ def totals():
         conn.close()
         return jsonify(rows)
     except Exception:
-        return jsonify(MOCK_TOTALS)
+        return jsonify(MOCK_TOTALS if ALLOW_MOCK else [])
+
+
+# ── Claim (one-tap rescue from the dashboard) ────────────────────────────────
+
+@app.route("/api/claim", methods=["POST"])
+def claim():
+    """Rescue a leftover from the dashboard. Claims the whole remaining lot in a
+    single event so the row clears from the board. Returns the £ value rescued.
+
+    Body: {product_id, user?, qty?}. Falls back to an optimistic echo when the
+    DB is unavailable (mock mode) so the UI still behaves on stage."""
+    body = request.get_json(silent=True) or {}
+    product_id = body.get("product_id")
+    user = body.get("user") or "U-dashboard"
+    if product_id is None:
+        return jsonify({"ok": False, "error": "product_id required"}), 400
+    # Big qty → store clamps to whatever is actually left (whole lot, one event).
+    qty = body.get("qty", 9999)
+    try:
+        import store
+        res = store.claim_product(int(product_id), user, qty=qty)
+        return jsonify({"ok": True, "product_id": product_id, "name": res["name"],
+                        "value": res["value"], "qty_left": res["qty_left"]})
+    except ValueError:
+        # Already gone (someone else claimed it) — a no-op success; the board
+        # will reconcile on the next poll.
+        return jsonify({"ok": True, "product_id": product_id, "value": 0, "qty_left": 0})
+    except Exception:
+        # DB unavailable — echo an optimistic success so mock mode keeps working.
+        return jsonify({"ok": True, "product_id": product_id,
+                        "value": body.get("value", 0), "qty_left": 0})
 
 
 # ── SSE endpoint — live event stream ─────────────────────────────────────────
@@ -249,7 +320,13 @@ def events_stream():
                 if conn:
                     cur = conn.cursor()
                     cur.execute(
-                        "SELECT id, kind, value, user_slack_id FROM events WHERE id > ? ORDER BY id LIMIT 20",
+                        """SELECT e.id, e.kind, e.value, e.user_slack_id,
+                                  COALESCE(u.name, e.user_slack_id) AS user_name,
+                                  p.name AS item
+                           FROM events e
+                           LEFT JOIN users u ON u.slack_id = e.user_slack_id
+                           LEFT JOIN products p ON p.id = e.product_id
+                           WHERE e.id > ? ORDER BY e.id LIMIT 20""",
                         (last_id,)
                     )
                     rows = cur.fetchall()
@@ -259,7 +336,8 @@ def events_stream():
                         payload = json.dumps({
                             "kind":  row["kind"],
                             "value": float(row["value"] or 0),
-                            "user":  row["user_slack_id"],
+                            "user":  row["user_name"] or row["user_slack_id"],
+                            "item":  row["item"] or "an item",
                         })
                         yield f"data: {payload}\n\n"
             except Exception:
