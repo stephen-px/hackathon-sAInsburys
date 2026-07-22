@@ -62,7 +62,15 @@ def _run(respond, thunk):
 def _record_checkin(respond, body, fraction):
     product_id = int(body["actions"][0]["value"])
     user = body["user"]["id"]
-    result = store.record_consumption(user, product_id, fraction)
+    try:
+        result = store.record_consumption(user, product_id, fraction)
+    except ValueError:
+        # Stale DM: sent before a reset/refactor, or by a bot instance with a
+        # different local lunch.db — its button ids don't resolve here.
+        respond({"text": "🤔 That button is from an older check-in and I can't match "
+                         "it any more. Run `/demo-checkin` for a fresh one.",
+                 "response_type": "ephemeral", "replace_original": False})
+        return
     label = {1.0: "Ate it", 0.5: "Some left", 0.0: "Didn't touch"}[fraction]
     respond({"text": "Logged for *%s*: %s ✅" % (result["name"], label),
              "response_type": "ephemeral", "replace_original": False})
