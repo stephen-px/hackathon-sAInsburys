@@ -35,9 +35,12 @@ def handle_order_submit(body, client):
         text=":mag: Parsing your order... one sec!",
     )
 
+    print("[order] user=%s half=%s text=%r" % (user_id, half, order_text), flush=True)
+
     try:
         result = parser_agent.parse(user_id, order_text, half)
-        store.record_selection(user_id, week, half, freeform=order_text, parsed=result)
+        row = store.record_selection(user_id, week, half, freeform=order_text, parsed=result)
+        print("[order] recorded selection id=%s lines=%s" % (row["id"], result.get("product_lines")), flush=True)
 
         product_ids = [line["product_id"] for line in result.get("product_lines", [])]
         products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}

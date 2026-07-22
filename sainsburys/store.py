@@ -61,12 +61,34 @@ def confirm_selection(selection_id):
 
 # ── Catalogue helpers (used by agent tools) ───────────────────────────────────
 
+_STOPWORDS = {"a", "an", "the", "some", "of", "with", "and", "or", "for", "please"}
+
+
+def _stem(token):
+    # crude singular/plural + suffix normaliser so 'strawberry' matches 'Strawberries'
+    for suffix in ("ies", "es", "s", "y"):
+        if len(token) > len(suffix) + 2 and token.endswith(suffix):
+            return token[: -len(suffix)]
+    return token
+
+
 def search_products_db(query):
-    like = "%{}%".format(query)
+    tokens = [_stem(t) for t in query.lower().split() if t not in _STOPWORDS]
+    if not tokens:
+        return []
+    # rank rows by how many query tokens they match; return any-match, best first
+    score = " + ".join(
+        "(case when lower(name) like ? or lower(category) like ? then 1 else 0 end)"
+        for _ in tokens
+    )
+    where = " or ".join("lower(name) like ? or lower(category) like ?" for _ in tokens)
+    likes = []
+    for t in tokens:
+        likes += ["%{}%".format(t), "%{}%".format(t)]
     return _q(
-        "select id, name, category, price, shelf_life_days from products "
-        "where name like ? or category like ? limit 15",
-        (like, like),
+        "select id, name, category, price, shelf_life_days, ({score}) as hits "
+        "from products where {where} order by hits desc, price asc limit 15".format(score=score, where=where),
+        tuple(likes + likes),
         fetch="all",
     ) or []
 
