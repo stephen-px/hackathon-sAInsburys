@@ -48,3 +48,6 @@ logs/
 # Misc
 *.tmp
 *.bak
+
+# Live database — regenerate with: python sainsburys/data/seed.py
+sainsburys/data/lunch.db
