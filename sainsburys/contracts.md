@@ -16,12 +16,15 @@ get_meals_db() -> list[Meal]
 get_user_prefs_db(user_slack_id) -> dict
 get_products_by_ids(ids) -> list[Product]
 
+# Check-in (implemented — /demo-checkin)
+users_with_selections(week) -> list[slack_id]
+open_items_for(user, week) -> list[{lot_id, name, qty}]        # FIFO by expiry
+record_consumption(user, lot_id, fraction) -> {lot_id, name, qty, value}
+
 # TODO — not yet implemented
 build_baskets(week) -> list[Order]
 approve_order(order_id) -> Order
 deliver_order(order_id) -> list[Lot]
-open_items_for(user, week) -> list[LotShare]
-record_consumption(user, lot_id, fraction) -> Event
 leftovers() -> list[Lot]
 claim_lot(lot_id, user) -> Event
 sweep_waste(week) -> Digest
@@ -31,9 +34,18 @@ weekly_totals() -> list
 
 ## Slash commands
 
-| command  | handler                  | description          |
-|----------|--------------------------|----------------------|
-| /order   | handlers.order           | Open the order modal |
+| command       | handler                | description              |
+|---------------|------------------------|--------------------------|
+| /order        | handlers.order         | Open the order modal     |
+| /demo-checkin | handlers.demo_checkin  | Send Friday check-in DMs |
+
+## Button action_ids
+
+| action_id    | value  | handler                  |
+|--------------|--------|--------------------------|
+| checkin_ate  | lot_id | handlers.on_checkin_ate  |
+| checkin_some | lot_id | handlers.on_checkin_some |
+| checkin_none | lot_id | handlers.on_checkin_none |
 
 ## Modal callback_ids
 
