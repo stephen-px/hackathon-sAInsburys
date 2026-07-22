@@ -293,12 +293,83 @@ def record_consumption(user, product_id, fraction):
 
 # ── Rescue board ──────────────────────────────────────────────────────────────
 
-def leftovers():
-    raise NotImplementedError
+def leftovers(week=None):
+    """
+    What's left in the fridge, per product: everything the week's selections
+    ordered, minus 'consumed' and 'claimed' events. days_left is estimated
+    from the half's delivery day (Mon/Wed) + the product's shelf life.
+    Returns [{product_id, name, price, qty_left, days_left}].
+    """
+    from datetime import date, timedelta
+    today = date.today()
+    monday = date.fromisoformat(str(week)) if week else today - timedelta(days=today.weekday())
+
+    out = {}
+    for half, delivered in (("early", monday), ("late", monday + timedelta(days=2))):
+        selections = _q(
+            "select meal_id, parsed from selections where week = ? and half = ?",
+            (str(monday), half),
+            fetch="all",
+        ) or []
+        for sel in selections:
+            if sel["meal_id"]:
+                lines = _q(
+                    "select product_id, qty from meal_products where meal_id = ?",
+                    (sel["meal_id"],),
+                    fetch="all",
+                ) or []
+            elif sel["parsed"]:
+                lines = json.loads(sel["parsed"]).get("product_lines", [])
+            else:
+                continue
+            for line in lines:
+                pid = line["product_id"]
+                product = _q(
+                    "select name, price, shelf_life_days from products where id = ?",
+                    (pid,),
+                    fetch="one",
+                )
+                if not product:
+                    continue
+                days_left = (delivered + timedelta(days=product["shelf_life_days"]) - today).days
+                if pid in out:
+                    out[pid]["qty_left"] += line["qty"]
+                    out[pid]["days_left"] = min(out[pid]["days_left"], days_left)
+                else:
+                    out[pid] = {"product_id": pid, "name": product["name"],
+                                "price": product["price"], "qty_left": line["qty"],
+                                "days_left": days_left}
+
+    consumed = _q(
+        "select product_id, sum(qty) as q from events "
+        "where date(ts) >= ? and kind in ('consumed', 'claimed') group by product_id",
+        (str(monday),),
+        fetch="all",
+    ) or []
+    for ev in consumed:
+        if ev["product_id"] in out:
+            out[ev["product_id"]]["qty_left"] = round(out[ev["product_id"]]["qty_left"] - ev["q"], 2)
+
+    return [item for item in out.values() if item["qty_left"] > 0.01]
 
 
-def claim_lot(lot_id, user):
-    raise NotImplementedError
+def claim_product(product_id, user):
+    """
+    One-tap claim: log a 'claimed' event for one unit (or whatever fraction is
+    left). Raises ValueError if nothing is left. Returns {name, value, qty_left}.
+    """
+    item = next((i for i in leftovers() if i["product_id"] == product_id), None)
+    if not item:
+        raise ValueError("nothing left of product %s" % product_id)
+    qty = min(1.0, item["qty_left"])
+    value = round(qty * item["price"], 2)
+    _q(
+        "insert into events (kind, user_slack_id, product_id, qty, value) "
+        "values ('claimed', ?, ?, ?, ?)",
+        (user, product_id, qty, value),
+    )
+    return {"product_id": product_id, "name": item["name"], "value": value,
+            "qty_left": round(item["qty_left"] - qty, 2)}
 
 
 # ── Digest / reporting ────────────────────────────────────────────────────────

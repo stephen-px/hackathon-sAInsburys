@@ -8,6 +8,8 @@ features:
       description: Order your lunch for the week
     - command: /demo-checkin
       description: Send Friday what-did-you-eat DMs
+    - command: /demo-rescue
+      description: Post the rescue board with one-tap claiming
 oauth_config:
   scopes:
     bot:

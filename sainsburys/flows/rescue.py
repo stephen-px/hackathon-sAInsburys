@@ -19,6 +19,25 @@ def send_checkin_dms(client):
     return sent
 
 
+def _risk(item):
+    """Deterministic expiry-risk score (see CLAUDE.md) — no LLM here."""
+    return (3.0 / (max(item["days_left"], 0) + 0.5)
+            + 0.2 * float(item["price"])
+            + 0.1 * float(item["qty_left"]))
+
+
+def post_board(client, channel):
+    """Post the public rescue board, highest expiry risk first."""
+    items = sorted(store.leftovers(), key=_risk, reverse=True)
+    if not items:
+        client.chat_postMessage(channel=channel,
+                                text="Fridge is empty — nothing to rescue 🎉")
+        return
+    client.chat_postMessage(channel=channel,
+                            text="🛟 Rescue board — claim it before it's binned",
+                            blocks=blocks.rescue_board_blocks(items))
+    # Personalised top-3 DMs (agents/personaliser.py, Track B) plug in here.
+
+
 # TODO
-def post_board(client, channel): raise NotImplementedError
 def sweep_and_digest(client, channel): raise NotImplementedError

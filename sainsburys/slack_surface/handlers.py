@@ -44,6 +44,36 @@ def register(app):
         ack()
         _run(respond, lambda: _record_checkin(respond, body, fraction=0.0))
 
+    # ── /demo-rescue (mirrors the real Fri 11:30 trigger) ───────────────────────
+
+    @app.command("/demo-rescue")
+    def demo_rescue(ack, respond, client, body):
+        ack()
+        _run(respond, lambda: rescue.post_board(client, body["channel_id"]))
+
+    @app.action("claim")
+    def on_claim(ack, respond, body, client):
+        ack()
+
+        def _claim():
+            product_id = int(body["actions"][0]["value"])
+            user = body["user"]["id"]
+            try:
+                result = store.claim_product(product_id, user)
+            except ValueError:
+                respond({"text": "😅 Too slow — nothing left of that one. "
+                                 "Run `/demo-rescue` for the latest board.",
+                         "response_type": "ephemeral", "replace_original": False})
+                return
+            client.chat_postMessage(
+                channel=body["channel"]["id"],
+                thread_ts=body["message"]["ts"],
+                text="🛟 <@%s> rescued *%s* — £%.2f saved from the bin! 💚" % (
+                    user, result["name"], result["value"]),
+            )
+
+        _run(respond, _claim)
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
