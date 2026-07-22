@@ -1,0 +1,40 @@
+services:
+
+  # ── One-shot DB initialiser ─────────────────────────────────────────────────
+  # Creates the SQLite schema and seeds the product catalogue.
+  # Re-running is safe (idempotent).  Delete sainsburys/data/lunch.db to wipe.
+  init:
+    build: .
+    command: python sainsburys/data/init_db.py
+    volumes:
+      - .:/app
+    env_file:
+      - sainsburys/.env
+
+  # ── Slack bot ───────────────────────────────────────────────────────────────
+  bot:
+    build: .
+    command: python sainsburys/app.py
+    volumes:
+      - .:/app
+    env_file:
+      - sainsburys/.env
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ── Live dashboard ──────────────────────────────────────────────────────────
+  dashboard:
+    build: .
+    command: python sainsburys/dashboard/api.py
+    ports:
+      - "8888:3000"
+    volumes:
+      - .:/app
+    env_file:
+      - sainsburys/.env
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
