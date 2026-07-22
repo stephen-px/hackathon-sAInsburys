@@ -234,9 +234,13 @@ function StatTile({ icon, value, label, accent, sub }) {
 
 /* ── Fridge HP ──────────────────────────────────────────────────────── */
 function FridgeHP({ rescue }) {
-  const expiring = rescue.filter(r => r.days_left <= 1).length;
+  const expiring = rescue.filter(r => r.days_left <= 5).length;
   const total    = rescue.length || 1;
-  const hp       = Math.round(((total - expiring) / total) * 100);
+  // Graded damage over a 5-day window: an item due today hurts full, one 5 days
+  // out barely registers — so HP tracks the whole spread of expiry risk, not a cliff.
+  const damage   = rescue.reduce((s, r) =>
+    s + (r.days_left <= 5 ? Math.max(0, (6 - r.days_left) / 6) : 0), 0);
+  const hp       = Math.round((1 - damage / total) * 100);
   const color    = hp > 65 ? '#70D913' : hp > 35 ? 'var(--color-key-warning)' : 'var(--color-key-error)';
   const label    = hp > 65 ? 'Healthy' : hp > 35 ? 'At Risk' : 'Critical';
   const TICKS    = [0,20,40,60,80,100];
