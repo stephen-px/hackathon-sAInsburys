@@ -9,20 +9,41 @@ swapping to Postgres/Supabase later only changes this file's internals.
 import json
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 DB_PATH = os.environ.get("LUNCH_DB", str(Path(__file__).parent / "data" / "lunch.db"))
 
 
 def _conn():
-    conn = sqlite3.connect(DB_PATH)
+    # 5s busy_timeout + WAL so the bot's writes and the dashboard's SSE reads
+    # never deadlock (WAL lets readers run concurrently with a single writer).
+    conn = sqlite3.connect(DB_PATH, timeout=5.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("pragma journal_mode = wal")
+    conn.execute("pragma busy_timeout = 5000")
     conn.execute("pragma foreign_keys = on")
     return conn
 
 
+@contextmanager
+def _tx():
+    """Transaction scope: commit on success, roll back on error, ALWAYS close.
+
+    sqlite3's own `with conn` manages the transaction but never closes the
+    handle — a leaked open connection keeps holding locks, which is what
+    deadlocked the bot against the dashboard's SSE reader.
+    """
+    conn = _conn()
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
 def _q(sql, params=(), fetch=None):
-    with _conn() as conn:
+    with _tx() as conn:
         cur = conn.execute(sql, params)
         if fetch == "one":
             row = cur.fetchone()
@@ -133,22 +154,24 @@ def get_products_by_ids(ids):
 
 # ── Orders / baskets ──────────────────────────────────────────────────────────
 
-def _selection_lines(week, half):
-    """Aggregate qty per product across the week's selections for one half."""
-    selections = _q(
+def _selection_lines(week, half, conn):
+    """Aggregate qty per product across the week's selections for one half.
+
+    Reads on the caller's connection so it never opens a nested handle inside
+    an in-flight write transaction (that self-deadlocks SQLite).
+    """
+    selections = conn.execute(
         "select meal_id, parsed from selections "
         "where week = ? and half = ? and status in ('pending', 'confirmed')",
         (str(week), half),
-        fetch="all",
-    ) or []
+    ).fetchall()
     qty_by_product = {}
     for sel in selections:
         if sel["meal_id"]:
-            lines = _q(
+            lines = [dict(r) for r in conn.execute(
                 "select product_id, qty from meal_products where meal_id = ?",
                 (sel["meal_id"],),
-                fetch="all",
-            ) or []
+            ).fetchall()]
         elif sel["parsed"]:
             lines = json.loads(sel["parsed"]).get("product_lines", [])
         else:
@@ -162,25 +185,47 @@ def _selection_lines(week, half):
 def build_baskets(week):
     """
     Deterministic aggregation: this week's selections → two draft orders
-    (early → Monday delivery, late → Wednesday). Re-running replaces any
-    existing draft orders for the week. Returns orders with a "lines" list.
+    (early → Monday delivery, late → Wednesday). Only replaces a half's
+    existing draft if there are actual selections for it — so demo-seeded
+    orders are never silently deleted by a half-empty order run.
+    Returns the orders that were created or already existed.
     """
     from datetime import date, timedelta
     monday = date.fromisoformat(str(week))
     orders = []
-    with _conn() as conn:
-        stale = conn.execute(
-            "select id from orders where week = ? and status = 'draft'", (str(week),)
-        ).fetchall()
-        for row in stale:
-            conn.execute("delete from order_lines where order_id = ?", (row["id"],))
-            conn.execute("delete from orders where id = ?", (row["id"],))
-
+    with _tx() as conn:
         for half, delivery in (("early", monday), ("late", monday + timedelta(days=2))):
-            qty_by_product = _selection_lines(week, half)
+            qty_by_product = _selection_lines(week, half, conn)
             if not qty_by_product:
+                # No new selections for this half — leave any existing draft alone
+                existing = conn.execute(
+                    "select id, week, delivery_date, status from orders "
+                    "where week = ? and delivery_date = ? and status = 'draft'",
+                    (str(week), str(delivery)),
+                ).fetchone()
+                if existing:
+                    lines = conn.execute(
+                        "select p.name, ol.qty, ol.unit_price "
+                        "from order_lines ol join products p on p.id = ol.product_id "
+                        "where ol.order_id = ?", (existing["id"],)
+                    ).fetchall()
+                    orders.append({
+                        "id": existing["id"], "week": str(week),
+                        "delivery_date": str(delivery), "status": "draft",
+                        "lines": [dict(l) for l in lines],
+                    })
                 continue
-            # Mark swept selections 'ordered' so re-running never double-counts them
+
+            # We have selections — delete the stale draft for this half and rebuild
+            stale = conn.execute(
+                "select id from orders where week = ? and delivery_date = ? and status = 'draft'",
+                (str(week), str(delivery)),
+            ).fetchall()
+            for row in stale:
+                conn.execute("delete from order_lines where order_id = ?", (row["id"],))
+                conn.execute("delete from orders where id = ?", (row["id"],))
+
+            # Mark swept selections so re-running never double-counts them
             conn.execute(
                 "update selections set status = 'ordered' "
                 "where week = ? and half = ? and status in ('pending', 'confirmed')",
@@ -294,22 +339,82 @@ def record_consumption(user, product_id, fraction):
 # ── Rescue board ──────────────────────────────────────────────────────────────
 
 def leftovers():
-    raise NotImplementedError
+    return _q("""
+        SELECT l.id, p.name, p.price,
+               CAST(julianday(l.expiry_date) - julianday('now') AS INTEGER) as days_left,
+               l.qty_remaining,
+               3.0 / (MAX(CAST(julianday(l.expiry_date) - julianday('now') AS REAL), 0) + 0.5)
+                   + 0.2 * p.price + 0.1 * l.qty_remaining AS risk_score
+        FROM inventory_lots l
+        JOIN products p ON p.id = l.product_id
+        WHERE l.qty_remaining > 0
+        ORDER BY risk_score DESC
+    """, fetch="all") or []
 
 
 def claim_lot(lot_id, user):
-    raise NotImplementedError
+    lot = _q(
+        "SELECT l.id, l.qty_remaining, p.name, p.price "
+        "FROM inventory_lots l JOIN products p ON p.id = l.product_id "
+        "WHERE l.id = ? AND l.qty_remaining > 0",
+        (lot_id,), fetch="one",
+    )
+    if not lot:
+        raise ValueError("lot %s not found or already fully claimed" % lot_id)
+    value = round(float(lot["price"]), 2)
+    with _tx() as conn:
+        conn.execute(
+            "UPDATE inventory_lots SET qty_remaining = qty_remaining - 1 WHERE id = ?", (lot_id,)
+        )
+        conn.execute(
+            "INSERT INTO events (kind, user_slack_id, lot_id, qty, value) VALUES ('claimed', ?, ?, 1, ?)",
+            (user, lot_id, value),
+        )
+    return {"lot_id": lot_id, "name": lot["name"], "value": value}
 
 
 # ── Digest / reporting ────────────────────────────────────────────────────────
 
 def sweep_waste(week):
-    raise NotImplementedError
+    """Mark expired lots (qty_remaining > 0, expiry <= today) as wasted. Returns digest."""
+    lots = _q("""
+        SELECT l.id, l.qty_remaining, p.name, p.price
+        FROM inventory_lots l JOIN products p ON p.id = l.product_id
+        WHERE l.qty_remaining > 0 AND l.expiry_date <= date('now')
+    """, fetch="all") or []
+    total_value = 0.0
+    with _tx() as conn:
+        for lot in lots:
+            value = round(float(lot["qty_remaining"]) * float(lot["price"]), 2)
+            total_value += value
+            conn.execute(
+                "INSERT INTO events (kind, lot_id, qty, value) VALUES ('wasted', ?, ?, ?)",
+                (lot["id"], lot["qty_remaining"], value),
+            )
+            conn.execute("UPDATE inventory_lots SET qty_remaining = 0 WHERE id = ?", (lot["id"],))
+    return {"wasted_items": len(lots), "wasted_value": round(total_value, 2)}
 
 
 def leaderboard():
-    raise NotImplementedError
+    return _q("""
+        SELECT e.user_slack_id as slack_id,
+               COALESCE(u.name, e.user_slack_id) as name,
+               SUM(e.value) as saved
+        FROM events e
+        LEFT JOIN users u ON u.slack_id = e.user_slack_id
+        WHERE e.kind = 'claimed'
+        GROUP BY e.user_slack_id
+        ORDER BY saved DESC LIMIT 10
+    """, fetch="all") or []
 
 
 def weekly_totals():
-    raise NotImplementedError
+    rows = _q("""
+        SELECT strftime('%m-%d', datetime(ts, 'weekday 1', '-7 days')) as week,
+               SUM(CASE WHEN kind = 'claimed' THEN value ELSE 0 END) as claimed,
+               SUM(CASE WHEN kind = 'wasted'  THEN value ELSE 0 END) as wasted
+        FROM events
+        GROUP BY week
+        ORDER BY week DESC LIMIT 6
+    """, fetch="all") or []
+    return list(reversed(rows))

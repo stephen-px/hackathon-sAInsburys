@@ -100,6 +100,19 @@
     @keyframes xp-grow {
       from { width: 0%; }
     }
+
+    /* ── Morrison mascot ────────────────────────────────────────────────── */
+    @keyframes morrison-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+    @keyframes morrison-blink { 0%,87%,100%{transform:scaleY(1)} 91%{transform:scaleY(0.08)} }
+    @keyframes morrison-wiggle { 0%{transform:rotate(0deg) translateY(0)} 15%{transform:rotate(-12deg) translateY(-4px)} 30%{transform:rotate(12deg) translateY(-6px)} 45%{transform:rotate(-10deg) translateY(-4px)} 60%{transform:rotate(8deg) translateY(-3px)} 75%{transform:rotate(-5deg) translateY(-1px)} 100%{transform:rotate(0deg) translateY(0)} }
+    @keyframes morrison-squish { 0%{transform:scale(1,1)} 20%{transform:scale(1.15,0.88)} 40%{transform:scale(0.9,1.1)} 60%{transform:scale(1.08,0.94)} 80%{transform:scale(0.96,1.04)} 100%{transform:scale(1,1)} }
+    .morrison-svg { animation: morrison-bob 3.2s ease-in-out infinite; cursor: pointer; }
+    .morrison-svg:hover { filter: brightness(1.08); }
+    .morrison-svg.tickled { animation: morrison-wiggle 0.55s ease-in-out; }
+    .morrison-el { transform-origin: 100px 116px; }
+    .morrison-er { transform-origin: 148px 116px; }
+    .morrison-blink-l { animation: morrison-blink var(--blink-dur, 4.5s) ease-in-out infinite; }
+    .morrison-blink-r { animation: morrison-blink var(--blink-dur, 4.5s) ease-in-out infinite 0.12s; }
   </style>
 </head>
 <body>
@@ -125,6 +138,50 @@
 
     function PXMark({ size = 22 }) {
       return <img src="/assets/px-logo.png" width={size} height={size} style={{ display:'block', objectFit:'contain' }} alt="PX" />;
+    }
+
+    /* ── Morrison mascot ────────────────────────────────────────────────── */
+    function Morrison({ size = 120 }) {
+      const [tickled, setTickled] = useState(false);
+      const scale = size / 248;
+      const handleClick = useCallback(() => {
+        setTickled(true);
+        setTimeout(() => setTickled(false), 600);
+      }, []);
+      return (
+        <svg
+          className={`morrison-svg${tickled ? ' tickled' : ''}`}
+          style={{ '--blink-dur': '4.5s', width: size, height: size }}
+          onClick={handleClick}
+          viewBox="0 0 248 248"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* shadow */}
+          <ellipse cx="124" cy="238" rx="44" ry="7" fill="black" opacity="0.25"/>
+          {/* body */}
+          <circle cx="124" cy="118" r="96" fill="#F06D00"/>
+          {/* eyes */}
+          {!tickled ? (<>
+            <g className="morrison-el morrison-blink-l"><circle cx="100" cy="116" r="11" fill="#1A1C20"/><circle cx="96" cy="112" r="3.5" fill="white" opacity="0.75"/></g>
+            <g className="morrison-er morrison-blink-r"><circle cx="148" cy="116" r="11" fill="#1A1C20"/><circle cx="144" cy="112" r="3.5" fill="white" opacity="0.75"/></g>
+            <path d="M 107 142 Q 124 157 141 142" stroke="#1A1C20" strokeWidth="4.5" strokeLinecap="round" fill="none"/>
+          </>) : (<>
+            <path d="M 89 114 Q 100 106 111 114" stroke="#1A1C20" strokeWidth="4" strokeLinecap="round" fill="none"/>
+            <path d="M 137 114 Q 148 106 159 114" stroke="#1A1C20" strokeWidth="4" strokeLinecap="round" fill="none"/>
+            <path d="M 104 144 Q 124 164 144 144" stroke="#1A1C20" strokeWidth="5" strokeLinecap="round" fill="none"/>
+            {/* rosy cheeks */}
+            <ellipse cx="86" cy="134" rx="14" ry="8" fill="#FF9B4E" opacity="0.45"/>
+            <ellipse cx="162" cy="134" rx="14" ry="8" fill="#FF9B4E" opacity="0.45"/>
+          </>)}
+          {/* sandwich hat */}
+          <g transform="translate(94, 24)">
+            <rect x="0" y="14" width="60" height="10" rx="5" fill="#F5C842"/>
+            <rect x="3" y="9" width="54" height="8" rx="3" fill="#6BBF6A"/>
+            <rect x="3" y="0" width="54" height="13" rx="7" fill="#F5C842"/>
+          </g>
+        </svg>
+      );
     }
 
     /* ── XP / Level system ──────────────────────────────────────────────── */
@@ -294,11 +351,10 @@
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 6,
-              background: 'var(--color-key-primary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
+              flexShrink: 0, overflow: 'hidden',
             }}>
-              <PXMark size={24} />
+              <Morrison size={40} />
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.1 }}>sAInsburys</div>
@@ -402,6 +458,10 @@
             background:'radial-gradient(ellipse 70% 80% at 50% 110%, rgba(87,140,255,0.18) 0%, transparent 70%)',
             animation:'glow 4s ease-in-out infinite',
           }}/>
+
+          <div style={{ position:'relative', marginBottom:12 }}>
+            <Morrison size={100} />
+          </div>
 
           <div style={{
             fontSize:11, letterSpacing:'0.14em', textTransform:'uppercase',

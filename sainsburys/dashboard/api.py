@@ -197,7 +197,7 @@ def basket():
         cur.execute("""
             SELECT id, week, delivery_date, status
             FROM orders
-            WHERE week >= datetime('now', 'weekday 1', '-7 days')
+            WHERE week >= date('now', 'weekday 1', '-7 days')
             ORDER BY delivery_date
         """)
         orders = []

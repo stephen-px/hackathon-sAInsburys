@@ -6,8 +6,14 @@ features:
   slash_commands:
     - command: /order
       description: Order your lunch for the week
+    - command: /demo-aggregate
+      description: Build baskets from this week's orders and post for approval
     - command: /demo-checkin
       description: Send Friday what-did-you-eat DMs
+    - command: /demo-rescue
+      description: Post the rescue board — items at risk of going to waste
+    - command: /demo-sweep
+      description: End-of-week waste sweep and leaderboard digest
 oauth_config:
   scopes:
     bot:

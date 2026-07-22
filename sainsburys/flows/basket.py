@@ -42,6 +42,12 @@ def handle_order_submit(body, client):
         row = store.record_selection(user_id, week, half, freeform=order_text, parsed=result)
         print("[order] recorded selection id=%s lines=%s" % (row["id"], result.get("product_lines")), flush=True)
 
+        # Rebuild draft baskets so the dashboard shows the updated basket immediately
+        try:
+            store.build_baskets(week)
+        except Exception as e:
+            print("[order] build_baskets failed (non-fatal): %s" % e, flush=True)
+
         product_ids = [line["product_id"] for line in result.get("product_lines", [])]
         products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
         lines_text = _format_lines(result.get("product_lines", []), products)
