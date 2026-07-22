@@ -1,11 +1,16 @@
 """
-Seed the product catalogue and demo meals.
-Run once after applying schema.sql: python data/seed.py
-"""
-import os
-import psycopg2
+Seed the product catalogue and demo meals into SQLite.
+Safe to re-run: drops all tables and recreates from schema_sqlite.sql.
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+    python data/seed.py
+"""
+import json
+import sqlite3
+from pathlib import Path
+
+DATA_DIR = Path(__file__).parent
+DB_PATH = DATA_DIR / "lunch.db"
+SCHEMA = DATA_DIR / "schema_sqlite.sql"
 
 PRODUCTS = [
     # (name, category, price, shelf_life_days)
@@ -68,15 +73,15 @@ MEALS = [
         "description": "Smoked salmon with guacamole in a plain bagel",
         "tags": ["seafood", "bagel", "no-meat"],
         "products": [
-            ("Sainsbury's Smoked Salmon 100g",   1),
-            ("Sainsbury's Guacamole 150g",        1),
-            ("Sainsbury's Plain Bagels 5pk",      1),
+            ("Sainsbury's Smoked Salmon 100g", 1),
+            ("Sainsbury's Guacamole 150g",     1),
+            ("Sainsbury's Plain Bagels 5pk",   1),
         ],
     },
     {
         "name": "Salmon & Tabbouleh Bowl",
         "description": "Honey roast salmon flakes over tabbouleh",
-        "tags": ["seafood", "salad", "gluten-free", "no-meat"],
+        "tags": ["seafood", "salad", "no-meat"],
         "products": [
             ("Sainsbury's Honey Roast Salmon Flakes 120g", 1),
             ("Sainsbury's Tabbouleh 300g",                 1),
@@ -87,9 +92,9 @@ MEALS = [
         "description": "Chicken tikka pieces with mixed leaf in a flour wrap",
         "tags": ["chicken", "wrap", "spicy"],
         "products": [
-            ("Sainsbury's Chicken Tikka Pieces 150g",      1),
-            ("Sainsbury's Mixed Leaf Salad 100g",          1),
-            ("Sainsbury's Soft Flour Tortilla Wraps 8pk",  1),
+            ("Sainsbury's Chicken Tikka Pieces 150g",     1),
+            ("Sainsbury's Mixed Leaf Salad 100g",         1),
+            ("Sainsbury's Soft Flour Tortilla Wraps 8pk", 1),
         ],
     },
     {
@@ -118,36 +123,36 @@ MEALS = [
 
 
 def seed():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = sqlite3.connect(DB_PATH)
     try:
         with conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "TRUNCATE meal_products, meals, products, users "
-                    "RESTART IDENTITY CASCADE"
+            for table in ("events", "inventory_lots", "order_lines", "orders",
+                          "selections", "meal_products", "meals", "products", "users"):
+                conn.execute("drop table if exists %s" % table)
+            for view in ("leftovers", "leaderboard", "weekly_totals"):
+                conn.execute("drop view if exists %s" % view)
+
+            conn.executescript(SCHEMA.read_text())
+
+            conn.executemany(
+                "insert into products (name, category, price, shelf_life_days) values (?, ?, ?, ?)",
+                PRODUCTS,
+            )
+
+            prod_map = {row[1]: row[0] for row in conn.execute("select id, name from products")}
+
+            for meal in MEALS:
+                cur = conn.execute(
+                    "insert into meals (name, description, tags) values (?, ?, ?)",
+                    (meal["name"], meal["description"], json.dumps(meal["tags"])),
+                )
+                meal_id = cur.lastrowid
+                conn.executemany(
+                    "insert into meal_products (meal_id, product_id, qty) values (?, ?, ?)",
+                    [(meal_id, prod_map[pname], qty) for pname, qty in meal["products"]],
                 )
 
-                cur.executemany(
-                    "INSERT INTO products (name, category, price, shelf_life_days) "
-                    "VALUES (%s, %s, %s, %s)",
-                    PRODUCTS,
-                )
-
-                cur.execute("SELECT id, name FROM products")
-                prod_map = {row[1]: row[0] for row in cur.fetchall()}
-
-                for meal in MEALS:
-                    cur.execute(
-                        "INSERT INTO meals (name, description, tags) VALUES (%s, %s, %s) RETURNING id",
-                        (meal["name"], meal["description"], meal["tags"]),
-                    )
-                    meal_id = cur.fetchone()[0]
-                    cur.executemany(
-                        "INSERT INTO meal_products (meal_id, product_id, qty) VALUES (%s, %s, %s)",
-                        [(meal_id, prod_map[pname], qty) for pname, qty in meal["products"]],
-                    )
-
-        print(f"Seeded {len(PRODUCTS)} products and {len(MEALS)} meals.")
+        print("Seeded %d products and %d meals into %s" % (len(PRODUCTS), len(MEALS), DB_PATH))
     finally:
         conn.close()
 

@@ -2,40 +2,41 @@
 Single source of truth for all DB reads/writes.
 No agent or handler should ever touch SQL directly — call these functions.
 See contracts.md for the full surface and payload shapes.
-"""
-import os
-from datetime import date
-import psycopg2
-from psycopg2.extras import RealDictCursor, Json
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+Backend: SQLite (sainsburys/data/lunch.db). Public signatures are backend-agnostic —
+swapping to Postgres/Supabase later only changes this file's internals.
+"""
+import json
+import os
+import sqlite3
+from pathlib import Path
+
+DB_PATH = os.environ.get("LUNCH_DB", str(Path(__file__).parent / "data" / "lunch.db"))
 
 
 def _conn():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("pragma foreign_keys = on")
+    return conn
 
 
 def _q(sql, params=(), fetch=None):
-    conn = _conn()
-    try:
-        with conn:
-            with conn.cursor() as cur:
-                cur.execute(sql, params)
-                if fetch == "one":
-                    row = cur.fetchone()
-                    return dict(row) if row else None
-                if fetch == "all":
-                    return [dict(r) for r in cur.fetchall()]
-    finally:
-        conn.close()
+    with _conn() as conn:
+        cur = conn.execute(sql, params)
+        if fetch == "one":
+            row = cur.fetchone()
+            return dict(row) if row else None
+        if fetch == "all":
+            return [dict(r) for r in cur.fetchall()]
 
 
 # ── Users ──────────────────────────────────────────────────────────────────────
 
-def ensure_user(slack_id: str, name: str):
+def ensure_user(slack_id, name):
     _q(
-        "INSERT INTO users (slack_id, name) VALUES (%s, %s) "
-        "ON CONFLICT (slack_id) DO UPDATE SET name = EXCLUDED.name",
+        "insert into users (slack_id, name) values (?, ?) "
+        "on conflict (slack_id) do update set name = excluded.name",
         (slack_id, name),
     )
 
@@ -45,68 +46,72 @@ def ensure_user(slack_id: str, name: str):
 def record_selection(user, week, half, meal_id=None, parsed=None, freeform=None):
     """Insert a selection row. Returns the Selection record."""
     return _q(
-        """INSERT INTO selections (week, half, user_slack_id, meal_id, freeform, parsed, status)
-           VALUES (%s, %s, %s, %s, %s, %s, 'pending')
-           RETURNING id, week, half, user_slack_id, meal_id, freeform, parsed, status""",
-        (week, half, user, meal_id, freeform, Json(parsed) if parsed else None),
+        "insert into selections (week, half, user_slack_id, meal_id, freeform, parsed, status) "
+        "values (?, ?, ?, ?, ?, ?, 'pending') "
+        "returning id, week, half, user_slack_id, meal_id, freeform, parsed, status",
+        (str(week), half, user, meal_id, freeform, json.dumps(parsed) if parsed else None),
         fetch="one",
     )
 
 
 def confirm_selection(selection_id):
     """Mark a selection confirmed."""
-    _q("UPDATE selections SET status = 'confirmed' WHERE id = %s", (selection_id,))
+    _q("update selections set status = 'confirmed' where id = ?", (selection_id,))
 
 
 # ── Catalogue helpers (used by agent tools) ───────────────────────────────────
 
-def search_products_db(query: str) -> list:
+def search_products_db(query):
+    like = "%{}%".format(query)
     return _q(
-        "SELECT id, name, category, price, shelf_life_days FROM products "
-        "WHERE name ILIKE %s OR category ILIKE %s LIMIT 15",
-        (f"%{query}%", f"%{query}%"),
+        "select id, name, category, price, shelf_life_days from products "
+        "where name like ? or category like ? limit 15",
+        (like, like),
         fetch="all",
     ) or []
 
 
-def get_meals_db() -> list:
-    return _q(
-        """SELECT m.id, m.name, m.description, m.tags,
-                  json_agg(json_build_object(
-                      'product_id', mp.product_id,
-                      'qty', mp.qty,
-                      'product_name', p.name
-                  )) AS products
-           FROM meals m
-           LEFT JOIN meal_products mp ON mp.meal_id = m.id
-           LEFT JOIN products p ON p.id = mp.product_id
-           GROUP BY m.id""",
-        fetch="all",
-    ) or []
+def get_meals_db():
+    meals = _q("select id, name, description, tags from meals", fetch="all") or []
+    for meal in meals:
+        meal["tags"] = json.loads(meal["tags"] or "[]")
+        meal["products"] = _q(
+            "select mp.product_id, mp.qty, p.name as product_name "
+            "from meal_products mp join products p on p.id = mp.product_id "
+            "where mp.meal_id = ?",
+            (meal["id"],),
+            fetch="all",
+        ) or []
+    return meals
 
 
-def get_user_prefs_db(user_slack_id: str) -> dict:
+def get_user_prefs_db(user_slack_id):
     row = _q(
-        "SELECT slack_id, dietary, taste FROM users WHERE slack_id = %s",
+        "select slack_id, dietary, taste from users where slack_id = ?",
         (user_slack_id,),
         fetch="one",
     )
-    return row or {"slack_id": user_slack_id, "dietary": [], "taste": {}}
+    if not row:
+        return {"slack_id": user_slack_id, "dietary": [], "taste": {}}
+    row["dietary"] = json.loads(row["dietary"] or "[]")
+    row["taste"] = json.loads(row["taste"] or "{}")
+    return row
 
 
-def get_products_by_ids(ids: list) -> list:
+def get_products_by_ids(ids):
     if not ids:
         return []
+    placeholders = ",".join("?" * len(ids))
     return _q(
-        "SELECT id, name, price FROM products WHERE id = ANY(%s)",
-        (ids,),
+        "select id, name, price from products where id in (%s)" % placeholders,
+        tuple(ids),
         fetch="all",
     ) or []
 
 
 # ── Orders / baskets ──────────────────────────────────────────────────────────
 
-def build_baskets(week) -> list:
+def build_baskets(week):
     raise NotImplementedError
 
 
@@ -114,39 +119,39 @@ def approve_order(order_id):
     raise NotImplementedError
 
 
-def deliver_order(order_id) -> list:
+def deliver_order(order_id):
     raise NotImplementedError
 
 
 # ── Check-in / consumption ────────────────────────────────────────────────────
 
-def open_items_for(user, week) -> list:
+def open_items_for(user, week):
     raise NotImplementedError
 
 
-def record_consumption(user, lot_id, fraction) -> dict:
+def record_consumption(user, lot_id, fraction):
     raise NotImplementedError
 
 
 # ── Rescue board ──────────────────────────────────────────────────────────────
 
-def leftovers() -> list:
+def leftovers():
     raise NotImplementedError
 
 
-def claim_lot(lot_id, user) -> dict:
+def claim_lot(lot_id, user):
     raise NotImplementedError
 
 
 # ── Digest / reporting ────────────────────────────────────────────────────────
 
-def sweep_waste(week) -> dict:
+def sweep_waste(week):
     raise NotImplementedError
 
 
-def leaderboard() -> list:
+def leaderboard():
     raise NotImplementedError
 
 
-def weekly_totals() -> list:
+def weekly_totals():
     raise NotImplementedError

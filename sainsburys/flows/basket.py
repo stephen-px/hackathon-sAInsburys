@@ -8,6 +8,16 @@ def _current_week():
     return today - timedelta(days=today.weekday())
 
 
+def _format_lines(product_lines, products):
+    lines = []
+    for line in product_lines:
+        product = products.get(line["product_id"], {})
+        name = product.get("name") or "Product %s" % line["product_id"]
+        cost = float(product.get("price") or 0) * float(line["qty"])
+        lines.append("• {qty}x *{name}* — £{cost:.2f}".format(qty=line["qty"], name=name, cost=cost))
+    return "\n".join(lines)
+
+
 def handle_order_submit(body, client):
     user_id = body["user"]["id"]
     user_name = body["user"].get("username", body["user"].get("name", user_id))
@@ -31,20 +41,15 @@ def handle_order_submit(body, client):
 
         product_ids = [line["product_id"] for line in result.get("product_lines", [])]
         products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
-
-        lines_text = "\n".join(
-            f"• {line['qty']}x *{products.get(line['product_id'], {}).get('name', f'Product {line[\"product_id\"]}')}"
-            f"* — £{float(products.get(line['product_id'], {}).get('price', 0)) * float(line['qty']):.2f}"
-            for line in result.get("product_lines", [])
-        )
-        notes = f"\n_Note: {result['notes']}_" if result.get("notes") else ""
+        lines_text = _format_lines(result.get("product_lines", []), products)
+        notes = "\n_Note: %s_" % result["notes"] if result.get("notes") else ""
 
         client.chat_postMessage(
             channel=dm_channel,
             text=(
-                f":white_check_mark: *Order logged for {half} week!*\n"
-                f"{lines_text}{notes}\n\n"
-                f'_Your request: "{order_text}"_'
+                ":white_check_mark: *Order logged for %s week!*\n"
+                "%s%s\n\n"
+                '_Your request: "%s"_' % (half, lines_text, notes, order_text)
             ),
         )
 
@@ -53,8 +58,8 @@ def handle_order_submit(body, client):
         client.chat_postMessage(
             channel=dm_channel,
             text=(
-                f":warning: Couldn't parse your order automatically, but I saved your request:\n"
-                f"> {order_text}\n"
-                f"_Error: {type(e).__name__}: {e}_"
+                ":warning: Couldn't parse your order automatically, but I saved your request:\n"
+                "> %s\n"
+                "_Error: %s: %s_" % (order_text, type(e).__name__, e)
             ),
         )
