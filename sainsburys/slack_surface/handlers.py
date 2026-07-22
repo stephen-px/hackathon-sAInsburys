@@ -16,6 +16,14 @@ def register(app):
         ack()
         basket.handle_order_submit(body, client)
 
+    # ── /demo-deliver (mirrors the real Mon/Wed arrival) ────────────────────────
+
+    @app.command("/demo-deliver")
+    def demo_deliver(ack, respond, client, body):
+        ack()
+        order_ids = [int(t) for t in (body.get("text") or "").split() if t.isdigit()]
+        _run(respond, lambda: basket.simulate_delivery(client, body["channel_id"], order_ids or None))
+
     # ── /demo-checkin (mirrors the real Fri 09:30 trigger) ──────────────────────
 
     @app.command("/demo-checkin")

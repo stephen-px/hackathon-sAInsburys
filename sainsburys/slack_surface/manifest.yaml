@@ -6,6 +6,8 @@ features:
   slash_commands:
     - command: /order
       description: Order your lunch for the week
+    - command: /demo-deliver
+      description: Simulate delivery and create inventory lots
     - command: /demo-checkin
       description: Send Friday what-did-you-eat DMs
 oauth_config:

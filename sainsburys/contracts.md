@@ -21,10 +21,13 @@ users_with_selections(week) -> list[slack_id]
 open_items_for(user, week) -> list[{lot_id, name, qty}]        # FIFO by expiry
 record_consumption(user, lot_id, fraction) -> {lot_id, name, qty, value}
 
-# TODO — not yet implemented
-build_baskets(week) -> list[Order]
+# Orders / delivery (implemented — /demo-deliver)
+build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price}]
 approve_order(order_id) -> Order
-deliver_order(order_id) -> list[Lot]
+approved_orders(week) -> list[Order]      # approved + undelivered
+deliver_order(order_id) -> list[Lot]      # expiry = delivery_date + shelf_life_days
+
+# TODO — not yet implemented
 leftovers() -> list[Lot]
 claim_lot(lot_id, user) -> Event
 sweep_waste(week) -> Digest
@@ -37,6 +40,7 @@ weekly_totals() -> list
 | command       | handler                | description              |
 |---------------|------------------------|--------------------------|
 | /order        | handlers.order         | Open the order modal     |
+| /demo-deliver | handlers.demo_deliver  | Create fridge lots (optional ids: `/demo-deliver 1 2`) |
 | /demo-checkin | handlers.demo_checkin  | Send Friday check-in DMs |
 
 ## Button action_ids
