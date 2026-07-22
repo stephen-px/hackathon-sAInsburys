@@ -66,3 +66,38 @@ def handle_order_submit(body, client):
                 "_Error: %s: %s_" % (order_text, type(e).__name__, e)
             ),
         )
+
+
+# ── /demo-deliver (Track A) ────────────────────────────────────────────────────
+
+def simulate_delivery(client, channel, order_ids=None):
+    """
+    Create fridge lots. Delivers explicit ids, else the week's approved orders.
+    Demo shortcut until /demo-aggregate lands: with nothing approved, build
+    baskets from this week's selections and deliver them directly (says so).
+    """
+    week = _current_week()
+    shortcut = False
+    if order_ids:
+        ids = order_ids
+    else:
+        ids = [o["id"] for o in store.approved_orders(week)]
+        if not ids:
+            drafts = store.build_baskets(week)
+            if not drafts:
+                client.chat_postMessage(channel=channel,
+                                        text="Nothing to deliver — no selections this week yet.")
+                return
+            ids = [store.approve_order(o["id"])["id"] for o in drafts]
+            shortcut = True
+
+    lots = []
+    for oid in ids:
+        lots.extend(store.deliver_order(oid))
+
+    note = ("\n_(demo shortcut: no approved baskets, so this week's selections were "
+            "built and delivered directly — the Approve step arrives with /demo-aggregate)_"
+            if shortcut else "")
+    client.chat_postMessage(
+        channel=channel,
+        text="📦 Delivery logged — %d lots now in the fridge.%s" % (len(lots), note))

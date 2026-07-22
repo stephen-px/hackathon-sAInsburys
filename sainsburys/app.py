@@ -10,10 +10,25 @@ load_dotenv(Path(__file__).parent / ".env")
 
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+
 from slack_surface import handlers
 
-app = App(token=os.environ["SLACK_BOT_TOKEN"])
-handlers.register(app)
+REQUIRED_ENV = ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "ANTHROPIC_API_KEY"]
+
+
+def _check_env():
+    missing = [k for k in REQUIRED_ENV if not os.environ.get(k)]
+    if missing:
+        sys.exit(f"Missing env vars: {', '.join(missing)} — copy .env.example to .env and fill them in.")
+
+
+def main():
+    _check_env()
+    app = App(token=os.environ["SLACK_BOT_TOKEN"])
+    handlers.register(app)
+    print("⚡ sAInsburys connecting via Socket Mode…")
+    SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()
+
 
 if __name__ == "__main__":
-    SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()
+    main()
