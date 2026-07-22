@@ -380,19 +380,24 @@ def user_week_summary(user, week):
 
 def leftovers(week=None):
     """
-    What's left in the fridge, per product: everything the week's selections
-    ordered, minus 'consumed' and 'claimed' events. days_left is estimated
-    from the half's delivery day (Mon/Wed) + the product's shelf life.
+    What's left in the fridge, per product. An ordered item only counts here once
+    its owner has CHECKED IN for it (a 'consumed' event exists for that user+product
+    this week) — before check-in it's still in the basket, not the rescue bin. Then
+    qty_left = ordered - latest consumed, minus any 'claimed'/'wasted'. days_left is
+    estimated from the half's delivery day (Mon/Wed) + the product's shelf life.
     Returns [{product_id, name, price, qty_left, days_left}].
     """
     from datetime import date, timedelta
     today = date.today()
     monday = date.fromisoformat(str(week)) if week else today - timedelta(days=today.weekday())
 
-    out = {}
+    # Ordered qty per (user, product), plus product metadata (min days_left across
+    # halves). We track by user so we can gate each person's order on their check-in.
+    ordered = {}   # (user_slack_id, pid) -> qty
+    meta = {}      # pid -> {name, price, days_left}
     for half, delivered in (("early", monday), ("late", monday + timedelta(days=2))):
         selections = _q(
-            "select meal_id, parsed from selections "
+            "select user_slack_id, meal_id, parsed from selections "
             "where week = ? and half = ? and status != 'void'",
             (str(monday), half),
             fetch="all",
@@ -418,35 +423,54 @@ def leftovers(week=None):
                 if not product:
                     continue
                 days_left = (delivered + timedelta(days=product["shelf_life_days"]) - today).days
-                if pid in out:
-                    out[pid]["qty_left"] += line["qty"]
-                    out[pid]["days_left"] = min(out[pid]["days_left"], days_left)
+                key = (sel["user_slack_id"], pid)
+                ordered[key] = ordered.get(key, 0) + line["qty"]
+                if pid in meta:
+                    meta[pid]["days_left"] = min(meta[pid]["days_left"], days_left)
                 else:
-                    out[pid] = {"product_id": pid, "name": product["name"],
-                                "price": product["price"], "qty_left": line["qty"],
-                                "days_left": days_left}
+                    meta[pid] = {"name": product["name"], "price": product["price"],
+                                 "days_left": days_left}
 
     # Consumed: the LATEST check-in answer per user+product (repeat taps correct,
-    # not accumulate). Claimed: every claim counts — each is food leaving the fridge.
+    # not accumulate). Its presence for a (user, product) is the "checked in" signal:
+    # an ordered item only becomes a leftover once its owner has checked in.
     consumed = _q(
-        "select product_id, sum(qty) as q from ("
-        "  select product_id, qty, row_number() over ("
+        "select user_slack_id, product_id, qty from ("
+        "  select user_slack_id, product_id, qty, row_number() over ("
         "    partition by user_slack_id, product_id order by ts desc, id desc) as rn"
         "  from events where kind = 'consumed' and date(ts) >= ?"
-        ") where rn = 1 group by product_id",
+        ") where rn = 1",
         (str(monday),),
         fetch="all",
     ) or []
+    consumed_by = {(ev["user_slack_id"], ev["product_id"]): ev["qty"] for ev in consumed}
+
+    out = {}
+    for (user, pid), qty in ordered.items():
+        if (user, pid) not in consumed_by:
+            continue  # not checked in yet — still in the basket, not the bin
+        left = qty - consumed_by[(user, pid)]
+        if pid in out:
+            out[pid]["qty_left"] += left
+        else:
+            m = meta[pid]
+            out[pid] = {"product_id": pid, "name": m["name"], "price": m["price"],
+                        "qty_left": left, "days_left": m["days_left"]}
+
+    # Claimed: every claim (or sweep) counts — each is food leaving the fridge. These
+    # subtract from the product-level pool (anyone can claim what's on the board).
     claimed = _q(
         "select product_id, sum(qty) as q from events "
         "where kind in ('claimed', 'wasted') and date(ts) >= ? group by product_id",
         (str(monday),),
         fetch="all",
     ) or []
-    for ev in consumed + claimed:
+    for ev in claimed:
         if ev["product_id"] in out:
             out[ev["product_id"]]["qty_left"] = round(out[ev["product_id"]]["qty_left"] - ev["q"], 2)
 
+    for item in out.values():
+        item["qty_left"] = round(item["qty_left"], 2)
     return [item for item in out.values() if item["qty_left"] > 0.01]
 
 
