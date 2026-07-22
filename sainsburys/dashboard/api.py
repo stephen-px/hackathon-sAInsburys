@@ -160,29 +160,17 @@ def leaderboard():
 
 @app.route("/api/rescue")
 def rescue():
+    # Selections-based model (no inventory lots): same source as /demo-rescue.
     try:
-        conn = get_db()
-        if conn is None:
-            return jsonify(MOCK_RESCUE)
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT
-                l.id,
-                p.name,
-                CAST(julianday(l.expiry_date) - julianday('now') AS INTEGER) as days_left,
-                l.qty_remaining,
-                p.price,
-                3.0 / (MAX(CAST(julianday(l.expiry_date) - julianday('now') AS REAL), 0) + 0.5)
-                    + 0.2 * p.price
-                    + 0.1 * l.qty_remaining AS risk_score
-            FROM inventory_lots l
-            JOIN products p ON p.id = l.product_id
-            WHERE l.qty_remaining > 0
-            ORDER BY risk_score DESC
-        """)
-        rows = [dict(r) for r in cur.fetchall()]
-        conn.close()
-        return jsonify(rows)
+        import store
+        from flows.rescue import _risk
+        items = sorted(store.leftovers(), key=_risk, reverse=True)
+        return jsonify([
+            {"id": i["product_id"], "name": i["name"], "days_left": i["days_left"],
+             "qty_remaining": i["qty_left"], "price": i["price"],
+             "risk_score": round(_risk(i), 2)}
+            for i in items
+        ])
     except Exception:
         return jsonify(MOCK_RESCUE)
 
