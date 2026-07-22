@@ -54,3 +54,4 @@ logs/
 sainsburys/data/lunch.db
 sainsburys/data/lunch.db-shm
 sainsburys/data/lunch.db-wal
+receipts/*
