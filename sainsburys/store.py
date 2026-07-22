@@ -80,6 +80,28 @@ def confirm_selection(selection_id):
     _q("update selections set status = 'confirmed' where id = ?", (selection_id,))
 
 
+def void_selection(selection_id):
+    """Mark a selection void (user hit Fix — a replacement is coming)."""
+    _q("update selections set status = 'void' where id = ?", (selection_id,))
+
+
+def get_selection(selection_id):
+    return _q(
+        "select id, week, half, user_slack_id, meal_id, freeform, parsed, status "
+        "from selections where id = ?",
+        (selection_id,),
+        fetch="one",
+    )
+
+
+def update_selection_parsed(selection_id, parsed):
+    """Attach a (re)parsed plan to an existing selection."""
+    _q(
+        "update selections set parsed = ?, status = 'pending' where id = ?",
+        (json.dumps(parsed), selection_id),
+    )
+
+
 # ── Catalogue helpers (used by agent tools) ───────────────────────────────────
 
 _STOPWORDS = {"a", "an", "the", "some", "of", "with", "and", "or", "for", "please"}
@@ -284,7 +306,8 @@ def open_items_for(user, week):
     Returns [{product_id, name, qty}] — the list the check-in DM shows.
     """
     selections = _q(
-        "select meal_id, parsed from selections where user_slack_id = ? and week = ?",
+        "select meal_id, parsed from selections "
+        "where user_slack_id = ? and week = ? and status != 'void'",
         (user, str(week)),
         fetch="all",
     ) or []
@@ -313,10 +336,11 @@ def open_items_for(user, week):
     return items
 
 
-def record_consumption(user, product_id, fraction):
+def record_consumption(user, product_id, fraction, qty_ordered=1.0):
     """
-    Log a Friday check-in answer: 'consumed' event for fraction of one
-    unit-as-sold of the product. fraction in [0, 1] (Ate=1, Some=0.5, None=0).
+    Log a Friday check-in answer: 'consumed' event for fraction of the user's
+    ordered quantity. fraction in [0, 1] (Ate=1, Some=0.5, None=0).
+    Events are append-only; readers take the LATEST answer per user+product.
     Returns {product_id, name, qty, value}.
     """
     product = _q(
@@ -326,7 +350,7 @@ def record_consumption(user, product_id, fraction):
     )
     if not product:
         raise ValueError("unknown product %s" % product_id)
-    qty = float(fraction)
+    qty = float(fraction) * float(qty_ordered)
     value = round(qty * product["price"], 2)
     _q(
         "insert into events (kind, user_slack_id, product_id, qty, value) "
@@ -334,6 +358,22 @@ def record_consumption(user, product_id, fraction):
         (user, product_id, qty, value),
     )
     return {"product_id": product_id, "name": product["name"], "qty": qty, "value": value}
+
+
+def user_week_summary(user, week):
+    """£ ordered vs £ eaten (latest answer per product) — for the check-in wrap-up."""
+    items = open_items_for(user, week)
+    prices = {p["id"]: p["price"] for p in get_products_by_ids([i["product_id"] for i in items])}
+    ordered_value = round(sum(i["qty"] * float(prices.get(i["product_id"], 0)) for i in items), 2)
+    row = _q(
+        "select sum(value) as eaten from ("
+        "  select value, row_number() over (partition by product_id order by ts desc, id desc) as rn"
+        "  from events where kind = 'consumed' and user_slack_id = ? and date(ts) >= ?"
+        ") where rn = 1",
+        (user, str(week)),
+        fetch="one",
+    )
+    return {"ordered_value": ordered_value, "eaten_value": round(row["eaten"] or 0, 2)}
 
 
 # ── Rescue board ──────────────────────────────────────────────────────────────
@@ -352,7 +392,8 @@ def leftovers(week=None):
     out = {}
     for half, delivered in (("early", monday), ("late", monday + timedelta(days=2))):
         selections = _q(
-            "select meal_id, parsed from selections where week = ? and half = ?",
+            "select meal_id, parsed from selections "
+            "where week = ? and half = ? and status != 'void'",
             (str(monday), half),
             fetch="all",
         ) or []
@@ -385,13 +426,24 @@ def leftovers(week=None):
                                 "price": product["price"], "qty_left": line["qty"],
                                 "days_left": days_left}
 
+    # Consumed: the LATEST check-in answer per user+product (repeat taps correct,
+    # not accumulate). Claimed: every claim counts — each is food leaving the fridge.
     consumed = _q(
-        "select product_id, sum(qty) as q from events "
-        "where date(ts) >= ? and kind in ('consumed', 'claimed') group by product_id",
+        "select product_id, sum(qty) as q from ("
+        "  select product_id, qty, row_number() over ("
+        "    partition by user_slack_id, product_id order by ts desc, id desc) as rn"
+        "  from events where kind = 'consumed' and date(ts) >= ?"
+        ") where rn = 1 group by product_id",
         (str(monday),),
         fetch="all",
     ) or []
-    for ev in consumed:
+    claimed = _q(
+        "select product_id, sum(qty) as q from events "
+        "where kind = 'claimed' and date(ts) >= ? group by product_id",
+        (str(monday),),
+        fetch="all",
+    ) or []
+    for ev in consumed + claimed:
         if ev["product_id"] in out:
             out[ev["product_id"]]["qty_left"] = round(out[ev["product_id"]]["qty_left"] - ev["q"], 2)
 
@@ -415,6 +467,19 @@ def claim_product(product_id, user):
     )
     return {"product_id": product_id, "name": item["name"], "value": value,
             "qty_left": round(item["qty_left"] - qty, 2)}
+
+
+def claimed_total(week=None):
+    """£ rescued from the bin this week — the running counter."""
+    from datetime import date, timedelta
+    today = date.today()
+    monday = date.fromisoformat(str(week)) if week else today - timedelta(days=today.weekday())
+    row = _q(
+        "select sum(value) as total from events where kind = 'claimed' and date(ts) >= ?",
+        (str(monday),),
+        fetch="one",
+    )
+    return round(row["total"] or 0, 2)
 
 
 # ── Digest / reporting ────────────────────────────────────────────────────────

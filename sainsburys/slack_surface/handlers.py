@@ -55,6 +55,42 @@ def register(app):
 
         _run(respond, _go)
 
+    # ── Order confirmation DM buttons ────────────────────────────────────────────
+
+    @app.action("order_confirm")
+    def on_order_confirm(ack, respond, body):
+        ack()
+
+        def _go():
+            store.confirm_selection(int(body["actions"][0]["value"]))
+            _replace_actions(respond, body, "✅ Confirmed — enjoy!")
+
+        _run(respond, _go)
+
+    @app.action("order_fix")
+    def on_order_fix(ack, respond, body, client):
+        ack()
+
+        def _go():
+            selection_id = int(body["actions"][0]["value"])
+            modal = basket.prefilled_order_modal(selection_id)
+            store.void_selection(selection_id)
+            _replace_actions(respond, body, "✏️ Superseded — check the new confirmation.")
+            client.views_open(trigger_id=body["trigger_id"], view=modal)
+
+        _run(respond, _go)
+
+    @app.action("order_retry")
+    def on_order_retry(ack, respond, body, client):
+        ack()
+
+        def _go():
+            selection_id = int(body["actions"][0]["value"])
+            _replace_actions(respond, body, "🔁 Retrying...")
+            basket.handle_retry(selection_id, client, _channel_id(body))
+
+        _run(respond, _go)
+
     # ── /demo-checkin (mirrors the real Fri 09:30 trigger) ──────────────────────
 
     @app.command("/demo-checkin")
@@ -69,19 +105,19 @@ def register(app):
         _run(respond, _go)
 
     @app.action("checkin_ate")
-    def on_checkin_ate(ack, respond, body):
+    def on_checkin_ate(ack, respond, body, client):
         ack()
-        _run(respond, lambda: _record_checkin(respond, body, fraction=1.0))
+        _run(respond, lambda: _record_checkin(respond, body, client, fraction=1.0))
 
     @app.action("checkin_some")
-    def on_checkin_some(ack, respond, body):
+    def on_checkin_some(ack, respond, body, client):
         ack()
-        _run(respond, lambda: _record_checkin(respond, body, fraction=0.5))
+        _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.5))
 
     @app.action("checkin_none")
-    def on_checkin_none(ack, respond, body):
+    def on_checkin_none(ack, respond, body, client):
         ack()
-        _run(respond, lambda: _record_checkin(respond, body, fraction=0.0))
+        _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.0))
 
     # ── /demo-rescue (mirrors the real Fri 11:30 trigger) ───────────────────────
 
@@ -104,11 +140,22 @@ def register(app):
                                  "Run `/demo-rescue` for the latest board.",
                          "response_type": "ephemeral", "replace_original": False})
                 return
+            total = store.claimed_total()
             client.chat_postMessage(
-                channel=body["channel"]["id"],
+                channel=_channel_id(body),
                 thread_ts=body["message"]["ts"],
-                text="🛟 <@%s> rescued *%s* — £%.2f saved from the bin! 💚" % (
-                    user, result["name"], result["value"]),
+                text="🛟 <@%s> rescued *%s* — £%.2f saved from the bin! 💚  "
+                     "Running total this week: *£%.2f*" % (
+                    user, result["name"], result["value"], total),
+            )
+            # Re-render the board in place so claimed-out items disappear
+            board = rescue.board_blocks()
+            client.chat_update(
+                channel=_channel_id(body),
+                ts=body["message"]["ts"],
+                text="🛟 Rescue board",
+                blocks=board if board else [{"type": "section", "text": {
+                    "type": "mrkdwn", "text": "🎉 *Everything rescued — fridge cleared!*"}}],
             )
 
         _run(respond, _claim)
@@ -157,11 +204,34 @@ def _run(respond, thunk):
                  "response_type": "ephemeral", "replace_original": False})
 
 
-def _record_checkin(respond, body, fraction):
-    product_id = int(body["actions"][0]["value"])
+def _channel_id(body):
+    channel = body.get("channel") or {}
+    return channel.get("id") or body["container"]["channel_id"]
+
+
+def _replace_actions(respond, body, note, value=None):
+    """Swap the (matching) actions block of the source message for a context note."""
+    new_blocks = []
+    for block in body["message"]["blocks"]:
+        if block.get("type") == "actions" and (
+            value is None
+            or any(e.get("value") == value for e in block.get("elements", []))
+        ):
+            new_blocks.append({"type": "context",
+                               "elements": [{"type": "mrkdwn", "text": note}]})
+        else:
+            new_blocks.append(block)
+    respond({"blocks": new_blocks, "text": note, "replace_original": True})
+    return new_blocks
+
+
+def _record_checkin(respond, body, client, fraction):
+    raw = body["actions"][0]["value"]          # "product_id:qty" (older DMs: just id)
+    product_id, _, qty_str = raw.partition(":")
+    product_id, qty_ordered = int(product_id), float(qty_str or 1)
     user = body["user"]["id"]
     try:
-        result = store.record_consumption(user, product_id, fraction)
+        result = store.record_consumption(user, product_id, fraction, qty_ordered)
     except ValueError:
         # Stale DM: sent before a reset/refactor, or by a bot instance with a
         # different local lunch.db — its button ids don't resolve here.
@@ -169,9 +239,21 @@ def _record_checkin(respond, body, fraction):
                          "it any more. Run `/demo-checkin` for a fresh one.",
                  "response_type": "ephemeral", "replace_original": False})
         return
-    label = {1.0: "Ate it", 0.5: "Some left", 0.0: "Didn't touch"}[fraction]
-    respond({"text": "Logged for *%s*: %s ✅" % (result["name"], label),
-             "response_type": "ephemeral", "replace_original": False})
+
+    label = {1.0: "✅ Ate it", 0.5: "🥡 Some left", 0.0: "🙈 Didn't touch"}[fraction]
+    new_blocks = _replace_actions(respond, body, "%s — *%s*" % (label, result["name"]), value=raw)
+
+    # All items answered? Post the weekly wrap-up.
+    if not any(b.get("type") == "actions" for b in new_blocks):
+        from flows.basket import _current_week
+        summary = store.user_week_summary(user, _current_week())
+        client.chat_postMessage(
+            channel=_channel_id(body),
+            thread_ts=body["message"]["ts"],
+            text="🧾 All done! You ate *£%.2f* of your *£%.2f* order this week. "
+                 "Whatever's left goes on the rescue board 🛟" % (
+                summary["eaten_value"], summary["ordered_value"]),
+        )
 
 
 def _order_modal():

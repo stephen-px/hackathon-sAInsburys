@@ -36,6 +36,19 @@ GET_USER_PREFS = {
     },
 }
 
+REJECT_REQUEST = {
+    "name": "reject_request",
+    "description": "Finisher: politely decline a request that is not a food/lunch order "
+                   "(non-food items, jokes, impossible asks). Give a short friendly reason.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "reason": {"type": "string", "description": "One friendly sentence explaining why"},
+        },
+        "required": ["reason"],
+    },
+}
+
 SUBMIT_MEAL_PLAN = {
     "name": "submit_meal_plan",
     "description": "Finisher: submit a structured product plan parsed from a freeform request.",
@@ -79,9 +92,14 @@ def submit_meal_plan(product_lines: list, half: str, notes: str = "") -> dict:
     return {"product_lines": product_lines, "half": half, "notes": notes}
 
 
+def reject_request(reason: str) -> dict:
+    return {"rejected": reason}
+
+
 IMPLS = {
     "search_products": search_products,
     "get_meals": get_meals,
     "get_user_prefs": get_user_prefs,
     "submit_meal_plan": submit_meal_plan,
+    "reject_request": reject_request,
 }

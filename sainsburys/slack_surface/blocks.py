@@ -30,6 +30,40 @@ def digest_blocks(digest):
     return [{"type": "section", "text": {"type": "mrkdwn", "text": msg}}]
 
 
+def order_confirmation_blocks(selection_id, half, lines_text, notes, order_text):
+    """Parsed order + Looks right / Fix it buttons (the hallucination backstop)."""
+    body = ":white_check_mark: *Order logged for %s week!*\n%s" % (half, lines_text)
+    if notes:
+        body += "\n_Note: %s_" % notes
+    sid = str(selection_id)
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": body}},
+        {"type": "context", "elements": [{"type": "mrkdwn",
+            "text": "Your request: “%s”" % order_text}]},
+        {"type": "actions", "elements": [
+            {"type": "button", "style": "primary",
+             "text": {"type": "plain_text", "text": "Looks right ✅"},
+             "action_id": "order_confirm", "value": sid},
+            {"type": "button",
+             "text": {"type": "plain_text", "text": "Fix it ✏️"},
+             "action_id": "order_fix", "value": sid},
+        ]},
+    ]
+
+
+def order_failure_blocks(selection_id, order_text, err):
+    """Parse failed: raw request saved, offer a one-tap retry."""
+    return [
+        {"type": "section", "text": {"type": "mrkdwn",
+            "text": ":warning: Couldn't parse your order automatically, but I saved it:\n> %s" % order_text}},
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": err}]},
+        {"type": "actions", "elements": [
+            {"type": "button", "text": {"type": "plain_text", "text": "Retry 🔁"},
+             "action_id": "order_retry", "value": str(selection_id)},
+        ]},
+    ]
+
+
 def rescue_board_blocks(items):
     """Risk-sorted leftovers ({product_id, name, price, qty_left, days_left}), one Claim button each."""
     blocks = [
@@ -64,14 +98,18 @@ def checkin_blocks(items):
         {"type": "divider"},
     ]
     for item in items:
-        product_id = str(item["product_id"])
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*%s*" % item["name"]}})
+        # value carries "product_id:qty_ordered" so the tap logs the right amount
+        value = "%s:%g" % (item["product_id"], item["qty"])
+        label = "*%s*" % item["name"]
+        if item["qty"] > 1:
+            label += "  ×%g" % item["qty"]
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": label}})
         blocks.append({"type": "actions", "elements": [
             {"type": "button", "style": "primary", "text": {"type": "plain_text", "text": "Ate it"},
-             "action_id": "checkin_ate", "value": product_id},
+             "action_id": "checkin_ate", "value": value},
             {"type": "button", "text": {"type": "plain_text", "text": "Some left"},
-             "action_id": "checkin_some", "value": product_id},
+             "action_id": "checkin_some", "value": value},
             {"type": "button", "style": "danger", "text": {"type": "plain_text", "text": "Didn't touch"},
-             "action_id": "checkin_none", "value": product_id},
+             "action_id": "checkin_none", "value": value},
         ]})
     return blocks
