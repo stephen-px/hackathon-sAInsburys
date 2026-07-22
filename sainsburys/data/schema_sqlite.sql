@@ -68,6 +68,7 @@ create table if not exists events (
   ts            text default (datetime('now')),
   kind          text check (kind in ('consumed','claimed','wasted')),
   user_slack_id text,
+  product_id    integer references products(id),
   lot_id        integer references inventory_lots(id),
   qty           real,
   value         real

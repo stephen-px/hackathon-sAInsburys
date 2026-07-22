@@ -68,37 +68,5 @@ def handle_order_submit(body, client):
         )
 
 
-# ── Delivery (Track A) ─────────────────────────────────────────────────────────
-# Team decision: no physical delivery tracking — everything ordered is assumed
-# delivered. Check-in auto-delivers, so /order → /demo-checkin needs no step
-# in between. /demo-deliver stays as an optional manual trigger.
-
-def ensure_delivered(week):
-    """
-    Idempotent: sweep any new selections into baskets and straight to fridge
-    lots (selections are marked 'ordered', so re-running delivers nothing twice).
-    Returns the newly created lots.
-    """
-    lots = []
-    for order in store.build_baskets(week):
-        store.approve_order(order["id"])
-        lots.extend(store.deliver_order(order["id"]))
-    return lots
-
-
-def simulate_delivery(client, channel, order_ids=None):
-    """Optional manual delivery trigger — check-in already does this itself."""
-    if order_ids:
-        lots = []
-        for oid in order_ids:
-            lots.extend(store.deliver_order(oid))
-    else:
-        lots = ensure_delivered(_current_week())
-    if lots:
-        client.chat_postMessage(
-            channel=channel,
-            text="📦 %d lots in the fridge from this week's orders." % len(lots))
-    else:
-        client.chat_postMessage(
-            channel=channel,
-            text="Fridge is up to date — no new orders since the last delivery.")
+# Team decision: no delivery tracking — /order writes selections, and the
+# Friday check-in works directly off what each person ordered.

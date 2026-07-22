@@ -16,14 +16,6 @@ def register(app):
         ack()
         basket.handle_order_submit(body, client)
 
-    # ── /demo-deliver (mirrors the real Mon/Wed arrival) ────────────────────────
-
-    @app.command("/demo-deliver")
-    def demo_deliver(ack, respond, client, body):
-        ack()
-        order_ids = [int(t) for t in (body.get("text") or "").split() if t.isdigit()]
-        _run(respond, lambda: basket.simulate_delivery(client, body["channel_id"], order_ids or None))
-
     # ── /demo-checkin (mirrors the real Fri 09:30 trigger) ──────────────────────
 
     @app.command("/demo-checkin")
@@ -68,9 +60,9 @@ def _run(respond, thunk):
 
 
 def _record_checkin(respond, body, fraction):
-    lot_id = int(body["actions"][0]["value"])
+    product_id = int(body["actions"][0]["value"])
     user = body["user"]["id"]
-    result = store.record_consumption(user, lot_id, fraction)
+    result = store.record_consumption(user, product_id, fraction)
     label = {1.0: "Ate it", 0.5: "Some left", 0.0: "Didn't touch"}[fraction]
     respond({"text": "Logged for *%s*: %s ✅" % (result["name"], label),
              "response_type": "ephemeral", "replace_original": False})

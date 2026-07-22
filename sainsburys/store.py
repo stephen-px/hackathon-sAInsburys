@@ -220,47 +220,6 @@ def approve_order(order_id):
     return order
 
 
-def approved_orders(week):
-    """Approved, undelivered orders for the week (what /demo-deliver picks up)."""
-    return _q(
-        "select id, week, delivery_date, status from orders where week = ? and status = 'approved'",
-        (str(week),),
-        fetch="all",
-    ) or []
-
-
-def deliver_order(order_id):
-    """
-    Create inventory_lots from an approved order: one lot per line, expiry =
-    delivery_date + shelf_life_days. Marks the order delivered. Returns lots.
-    """
-    order = _q("select id, delivery_date, status from orders where id = ?", (order_id,), fetch="one")
-    if not order:
-        raise ValueError("unknown order %s" % order_id)
-    lines = _q(
-        "select ol.product_id, ol.qty, p.shelf_life_days, p.name "
-        "from order_lines ol join products p on p.id = ol.product_id "
-        "where ol.order_id = ?",
-        (order_id,),
-        fetch="all",
-    ) or []
-    lots = []
-    with _conn() as conn:
-        for line in lines:
-            cur = conn.execute(
-                "insert into inventory_lots (product_id, delivery_date, expiry_date, qty_delivered, qty_remaining) "
-                "values (?, ?, date(?, '+' || ? || ' days'), ?, ?) "
-                "returning id, product_id, delivery_date, expiry_date, qty_delivered, qty_remaining",
-                (line["product_id"], order["delivery_date"], order["delivery_date"],
-                 line["shelf_life_days"], line["qty"], line["qty"]),
-            )
-            lot = dict(cur.fetchone())
-            lot["name"] = line["name"]
-            lots.append(lot)
-        conn.execute("update orders set status = 'delivered' where id = ?", (order_id,))
-    return lots
-
-
 # ── Check-in / consumption ────────────────────────────────────────────────────
 
 def users_with_selections(week):
@@ -275,8 +234,9 @@ def users_with_selections(week):
 
 def open_items_for(user, week):
     """
-    The user's selected products for the week, mapped to open fridge lots
-    (FIFO: earliest expiry first). Returns [{lot_id, name, qty}].
+    What the user ordered this week, straight from their selections
+    (meal picks expanded to products, freeform via the parsed plan).
+    Returns [{product_id, name, qty}] — the list the check-in DM shows.
     """
     selections = _q(
         "select meal_id, parsed from selections where user_slack_id = ? and week = ?",
@@ -302,48 +262,33 @@ def open_items_for(user, week):
 
     items = []
     for pid, qty in qty_by_product.items():
-        lot = _q(
-            "select l.id, l.qty_remaining, p.name "
-            "from inventory_lots l join products p on p.id = l.product_id "
-            "where l.product_id = ? and l.qty_remaining > 0 "
-            "order by l.expiry_date limit 1",
-            (pid,),
-            fetch="one",
-        )
-        if lot:
-            items.append({"lot_id": lot["id"], "name": lot["name"],
-                          "qty": min(qty, lot["qty_remaining"])})
+        product = _q("select id, name from products where id = ?", (pid,), fetch="one")
+        if product:
+            items.append({"product_id": pid, "name": product["name"], "qty": qty})
     return items
 
 
-def record_consumption(user, lot_id, fraction):
+def record_consumption(user, product_id, fraction):
     """
-    Log a check-in: decrement the lot by fraction of one unit-as-sold (the
-    per-person share, per the plan's simplification) and insert a 'consumed'
-    event. fraction in [0, 1]. Returns {lot_id, name, qty, value}.
+    Log a Friday check-in answer: 'consumed' event for fraction of one
+    unit-as-sold of the product. fraction in [0, 1] (Ate=1, Some=0.5, None=0).
+    Returns {product_id, name, qty, value}.
     """
-    lot = _q(
-        "select l.id, l.qty_remaining, p.name, p.price "
-        "from inventory_lots l join products p on p.id = l.product_id "
-        "where l.id = ?",
-        (lot_id,),
+    product = _q(
+        "select id, name, price from products where id = ?",
+        (product_id,),
         fetch="one",
     )
-    if not lot:
-        raise ValueError("unknown lot %s" % lot_id)
-    qty = min(float(fraction) * 1.0, lot["qty_remaining"])
-    value = round(qty * lot["price"], 2)
-    with _conn() as conn:
-        conn.execute(
-            "update inventory_lots set qty_remaining = qty_remaining - ? where id = ?",
-            (qty, lot_id),
-        )
-        conn.execute(
-            "insert into events (kind, user_slack_id, lot_id, qty, value) "
-            "values ('consumed', ?, ?, ?, ?)",
-            (user, lot_id, qty, value),
-        )
-    return {"lot_id": lot_id, "name": lot["name"], "qty": qty, "value": value}
+    if not product:
+        raise ValueError("unknown product %s" % product_id)
+    qty = float(fraction)
+    value = round(qty * product["price"], 2)
+    _q(
+        "insert into events (kind, user_slack_id, product_id, qty, value) "
+        "values ('consumed', ?, ?, ?, ?)",
+        (user, product_id, qty, value),
+    )
+    return {"product_id": product_id, "name": product["name"], "qty": qty, "value": value}
 
 
 # ── Rescue board ──────────────────────────────────────────────────────────────

@@ -17,17 +17,14 @@ get_user_prefs_db(user_slack_id) -> dict
 get_products_by_ids(ids) -> list[Product]
 
 # Check-in (implemented — /demo-checkin)
+# No delivery tracking: check-in works directly off each user's selections.
 users_with_selections(week) -> list[slack_id]
-open_items_for(user, week) -> list[{lot_id, name, qty}]        # FIFO by expiry
-record_consumption(user, lot_id, fraction) -> {lot_id, name, qty, value}
+open_items_for(user, week) -> list[{product_id, name, qty}]
+record_consumption(user, product_id, fraction) -> {product_id, name, qty, value}
 
-# Orders / delivery (implemented — auto-delivery: ordered ⇒ assumed delivered)
-# Selections move status pending/confirmed → 'ordered' when swept into baskets,
-# so build_baskets is idempotent. /demo-checkin auto-delivers before DMing.
+# Basket aggregation (implemented — future /demo-aggregate)
 build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price}]
 approve_order(order_id) -> Order
-approved_orders(week) -> list[Order]      # approved + undelivered
-deliver_order(order_id) -> list[Lot]      # expiry = delivery_date + shelf_life_days
 
 # TODO — not yet implemented
 leftovers() -> list[Lot]
@@ -42,16 +39,15 @@ weekly_totals() -> list
 | command       | handler                | description              |
 |---------------|------------------------|--------------------------|
 | /order        | handlers.order         | Open the order modal     |
-| /demo-deliver | handlers.demo_deliver  | Create fridge lots (optional ids: `/demo-deliver 1 2`) |
 | /demo-checkin | handlers.demo_checkin  | Send Friday check-in DMs |
 
 ## Button action_ids
 
-| action_id    | value  | handler                  |
-|--------------|--------|--------------------------|
-| checkin_ate  | lot_id | handlers.on_checkin_ate  |
-| checkin_some | lot_id | handlers.on_checkin_some |
-| checkin_none | lot_id | handlers.on_checkin_none |
+| action_id    | value      | handler                  |
+|--------------|------------|--------------------------|
+| checkin_ate  | product_id | handlers.on_checkin_ate  |
+| checkin_some | product_id | handlers.on_checkin_some |
+| checkin_none | product_id | handlers.on_checkin_none |
 
 ## Modal callback_ids
 

@@ -1,13 +1,11 @@
 import store
-from flows import basket
 from flows.basket import _current_week
 from slack_surface import blocks
 
 
 def send_checkin_dms(client):
-    """DM each user with selections this week their open items + Ate/Some/None buttons."""
+    """DM each user their ordered items for the week + Ate/Some/None buttons."""
     week = _current_week()
-    basket.ensure_delivered(week)  # ordered ⇒ assumed delivered — no separate step
     sent = 0
     for user in store.users_with_selections(week):
         items = store.open_items_for(user, week)
