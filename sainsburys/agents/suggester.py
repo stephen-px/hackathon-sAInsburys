@@ -15,7 +15,7 @@ def suggest(user_slack_ids: list, last_two_weeks_meal_ids: list) -> list:
         f"Users: {user_slack_ids}\n"
         f"Meals served in the last two weeks (avoid repeats): {last_two_weeks_meal_ids}"
     )
-    resp = run_agent(SYSTEM, user_msg, TOOLS, IMPLS)
+    resp = run_agent(SYSTEM, user_msg, TOOLS, IMPLS, finisher="submit_suggestions")
     # The finisher tool wrote structured output; find it in the last tool_use block.
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and block.name == "submit_suggestions":

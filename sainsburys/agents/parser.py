@@ -15,7 +15,7 @@ def parse(user_slack_id: str, freeform: str, half: str) -> dict:
     Returns {product_lines: [{product_id, qty}], half, notes}.
     """
     user_msg = f"User: {user_slack_id}\nDelivery half: {half}\nRequest: {freeform}"
-    resp = run_agent(SYSTEM, user_msg, TOOLS, IMPLS, max_turns=6)
+    resp = run_agent(SYSTEM, user_msg, TOOLS, IMPLS, max_turns=6, finisher="submit_meal_plan")
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and block.name == "submit_meal_plan":
             return block.input
