@@ -21,7 +21,11 @@ services:
       - sainsburys/.env
 
   # ── Slack bot ───────────────────────────────────────────────────────────────
+  # Opt-in only: the bot must run in EXACTLY ONE place or Slack round-robins
+  # events across instances (orders land in different databases at random).
+  # Start it explicitly with: docker compose --profile bot up bot
   bot:
+    profiles: ["bot"]
     build: .
     command: python sainsburys/app.py
     volumes:
