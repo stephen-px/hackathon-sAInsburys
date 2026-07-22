@@ -1,13 +1,10 @@
 # Block Kit builders — TODO
 def meal_picker_blocks(suggestions): raise NotImplementedError
-
-
 def basket_blocks(order):
     """Block Kit message for one draft basket order with an Approve button."""
     lines = order.get("lines", [])
     total = sum(l["qty"] * l["unit_price"] for l in lines)
     delivery = order["delivery_date"]
-    half_label = "Mon" if "01" in str(delivery)[-5:] or int(str(delivery)[8:10]) % 7 in (0, 1) else "delivery"
     items_text = "\n".join(
         "• %gx *%s* — £%.2f" % (l["qty"], l["name"], l["qty"] * l["unit_price"])
         for l in lines
@@ -24,36 +21,6 @@ def basket_blocks(order):
     ]
 
 
-def rescue_board_blocks(lots):
-    """Block Kit message for the public rescue board — one Claim button per lot."""
-    blks = [
-        {"type": "header", "text": {"type": "plain_text", "text": "🛟 Rescue Board — save it from the bin!"}},
-        {"type": "context", "elements": [{"type": "mrkdwn",
-            "text": "Tap *Claim* on anything you'll eat. Every claim ticks the counter. 💚"}]},
-        {"type": "divider"},
-    ]
-    for lot in lots:
-        days = lot.get("days_left", 0)
-        if days <= 0:
-            urgency = "🔴 *Expires today!*"
-        elif days == 1:
-            urgency = "⚠️ 1 day left"
-        else:
-            urgency = "🟡 %d days left" % days
-        blks.append({
-            "type": "section",
-            "text": {"type": "mrkdwn",
-                     "text": "*%s*  %s   £%.2f  ×%g remaining" % (
-                         lot["name"], urgency, lot["price"], lot["qty_remaining"])},
-            "accessory": {
-                "type": "button", "style": "primary",
-                "text": {"type": "plain_text", "text": "Claim 🙌"},
-                "action_id": "claim_lot", "value": str(lot["id"]),
-            },
-        })
-    return blks
-
-
 def digest_blocks(digest):
     """Weekly waste sweep summary."""
     n = digest.get("wasted_items", 0)
@@ -61,6 +28,31 @@ def digest_blocks(digest):
     msg = ("🗑️ *%d item%s swept as waste — £%.2f lost.*  "
            "Less next week: order only what you'll eat." % (n, "s" if n != 1 else "", v))
     return [{"type": "section", "text": {"type": "mrkdwn", "text": msg}}]
+
+
+def rescue_board_blocks(items):
+    """Risk-sorted leftovers ({product_id, name, price, qty_left, days_left}), one Claim button each."""
+    blocks = [
+        {"type": "header", "text": {"type": "plain_text",
+            "text": "🛟 Rescue board — claim it before it's binned"}},
+        {"type": "context", "elements": [{"type": "mrkdwn",
+            "text": "One tap = it's yours. Every claim counts as money saved from the bin."}]},
+        {"type": "divider"},
+    ]
+    for item in items:
+        days = item["days_left"]
+        urgency = ("🔴 expires *today*" if days <= 0
+                   else "🟠 *%d day%s* left" % (days, "" if days == 1 else "s") if days <= 2
+                   else "🟢 %d days left" % days)
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "*%s*\n£%.2f · %g left · %s" % (
+                item["name"], float(item["price"]), item["qty_left"], urgency)},
+            "accessory": {"type": "button", "style": "primary",
+                          "text": {"type": "plain_text", "text": "Claim"},
+                          "action_id": "claim", "value": str(item["product_id"])},
+        })
+    return blocks
 
 
 def checkin_blocks(items):

@@ -338,61 +338,105 @@ def record_consumption(user, product_id, fraction):
 
 # ── Rescue board ──────────────────────────────────────────────────────────────
 
-def leftovers():
-    return _q("""
-        SELECT l.id, p.name, p.price,
-               CAST(julianday(l.expiry_date) - julianday('now') AS INTEGER) as days_left,
-               l.qty_remaining,
-               3.0 / (MAX(CAST(julianday(l.expiry_date) - julianday('now') AS REAL), 0) + 0.5)
-                   + 0.2 * p.price + 0.1 * l.qty_remaining AS risk_score
-        FROM inventory_lots l
-        JOIN products p ON p.id = l.product_id
-        WHERE l.qty_remaining > 0
-        ORDER BY risk_score DESC
-    """, fetch="all") or []
+def leftovers(week=None):
+    """
+    What's left in the fridge, per product: everything the week's selections
+    ordered, minus 'consumed' and 'claimed' events. days_left is estimated
+    from the half's delivery day (Mon/Wed) + the product's shelf life.
+    Returns [{product_id, name, price, qty_left, days_left}].
+    """
+    from datetime import date, timedelta
+    today = date.today()
+    monday = date.fromisoformat(str(week)) if week else today - timedelta(days=today.weekday())
+
+    out = {}
+    for half, delivered in (("early", monday), ("late", monday + timedelta(days=2))):
+        selections = _q(
+            "select meal_id, parsed from selections where week = ? and half = ?",
+            (str(monday), half),
+            fetch="all",
+        ) or []
+        for sel in selections:
+            if sel["meal_id"]:
+                lines = _q(
+                    "select product_id, qty from meal_products where meal_id = ?",
+                    (sel["meal_id"],),
+                    fetch="all",
+                ) or []
+            elif sel["parsed"]:
+                lines = json.loads(sel["parsed"]).get("product_lines", [])
+            else:
+                continue
+            for line in lines:
+                pid = line["product_id"]
+                product = _q(
+                    "select name, price, shelf_life_days from products where id = ?",
+                    (pid,),
+                    fetch="one",
+                )
+                if not product:
+                    continue
+                days_left = (delivered + timedelta(days=product["shelf_life_days"]) - today).days
+                if pid in out:
+                    out[pid]["qty_left"] += line["qty"]
+                    out[pid]["days_left"] = min(out[pid]["days_left"], days_left)
+                else:
+                    out[pid] = {"product_id": pid, "name": product["name"],
+                                "price": product["price"], "qty_left": line["qty"],
+                                "days_left": days_left}
+
+    consumed = _q(
+        "select product_id, sum(qty) as q from events "
+        "where date(ts) >= ? and kind in ('consumed', 'claimed') group by product_id",
+        (str(monday),),
+        fetch="all",
+    ) or []
+    for ev in consumed:
+        if ev["product_id"] in out:
+            out[ev["product_id"]]["qty_left"] = round(out[ev["product_id"]]["qty_left"] - ev["q"], 2)
+
+    return [item for item in out.values() if item["qty_left"] > 0.01]
 
 
-def claim_lot(lot_id, user):
-    lot = _q(
-        "SELECT l.id, l.qty_remaining, p.name, p.price "
-        "FROM inventory_lots l JOIN products p ON p.id = l.product_id "
-        "WHERE l.id = ? AND l.qty_remaining > 0",
-        (lot_id,), fetch="one",
+def claim_product(product_id, user):
+    """
+    One-tap claim: log a 'claimed' event for one unit (or whatever fraction is
+    left). Raises ValueError if nothing is left. Returns {name, value, qty_left}.
+    """
+    item = next((i for i in leftovers() if i["product_id"] == product_id), None)
+    if not item:
+        raise ValueError("nothing left of product %s" % product_id)
+    qty = min(1.0, item["qty_left"])
+    value = round(qty * item["price"], 2)
+    _q(
+        "insert into events (kind, user_slack_id, product_id, qty, value) "
+        "values ('claimed', ?, ?, ?, ?)",
+        (user, product_id, qty, value),
     )
-    if not lot:
-        raise ValueError("lot %s not found or already fully claimed" % lot_id)
-    value = round(float(lot["price"]), 2)
-    with _tx() as conn:
-        conn.execute(
-            "UPDATE inventory_lots SET qty_remaining = qty_remaining - 1 WHERE id = ?", (lot_id,)
-        )
-        conn.execute(
-            "INSERT INTO events (kind, user_slack_id, lot_id, qty, value) VALUES ('claimed', ?, ?, 1, ?)",
-            (user, lot_id, value),
-        )
-    return {"lot_id": lot_id, "name": lot["name"], "value": value}
+    return {"product_id": product_id, "name": item["name"], "value": value,
+            "qty_left": round(item["qty_left"] - qty, 2)}
 
 
 # ── Digest / reporting ────────────────────────────────────────────────────────
 
 def sweep_waste(week):
-    """Mark expired lots (qty_remaining > 0, expiry <= today) as wasted. Returns digest."""
-    lots = _q("""
-        SELECT l.id, l.qty_remaining, p.name, p.price
-        FROM inventory_lots l JOIN products p ON p.id = l.product_id
-        WHERE l.qty_remaining > 0 AND l.expiry_date <= date('now')
-    """, fetch="all") or []
+    """
+    End-of-week sweep: whatever's still unclaimed/unconsumed in leftovers() is
+    logged as 'wasted'. Product-based (no lots) to match the check-in model.
+    Returns {wasted_items, wasted_value}.
+    """
+    items = leftovers(week)
     total_value = 0.0
     with _tx() as conn:
-        for lot in lots:
-            value = round(float(lot["qty_remaining"]) * float(lot["price"]), 2)
+        for item in items:
+            qty = item["qty_left"]
+            value = round(float(qty) * float(item["price"]), 2)
             total_value += value
             conn.execute(
-                "INSERT INTO events (kind, lot_id, qty, value) VALUES ('wasted', ?, ?, ?)",
-                (lot["id"], lot["qty_remaining"], value),
+                "insert into events (kind, product_id, qty, value) values ('wasted', ?, ?, ?)",
+                (item["product_id"], qty, value),
             )
-            conn.execute("UPDATE inventory_lots SET qty_remaining = 0 WHERE id = ?", (lot["id"],))
-    return {"wasted_items": len(lots), "wasted_value": round(total_value, 2)}
+    return {"wasted_items": len(items), "wasted_value": round(total_value, 2)}
 
 
 def leaderboard():

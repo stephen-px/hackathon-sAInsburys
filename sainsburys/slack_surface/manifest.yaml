@@ -11,7 +11,7 @@ features:
     - command: /demo-checkin
       description: Send Friday what-did-you-eat DMs
     - command: /demo-rescue
-      description: Post the rescue board — items at risk of going to waste
+      description: Post the rescue board with one-tap claiming
     - command: /demo-sweep
       description: End-of-week waste sweep and leaderboard digest
 oauth_config:

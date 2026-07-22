@@ -26,9 +26,11 @@ record_consumption(user, product_id, fraction) -> {product_id, name, qty, value}
 build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price}]
 approve_order(order_id) -> Order
 
+# Rescue board (implemented — /demo-rescue; product-keyed, no lots)
+leftovers(week=None) -> list[{product_id, name, price, qty_left, days_left}]
+claim_product(product_id, user) -> {product_id, name, value, qty_left}
+
 # TODO — not yet implemented
-leftovers() -> list[Lot]
-claim_lot(lot_id, user) -> Event
 sweep_waste(week) -> Digest
 leaderboard() -> list
 weekly_totals() -> list
@@ -40,6 +42,7 @@ weekly_totals() -> list
 |---------------|------------------------|--------------------------|
 | /order        | handlers.order         | Open the order modal     |
 | /demo-checkin | handlers.demo_checkin  | Send Friday check-in DMs |
+| /demo-rescue  | handlers.demo_rescue   | Post the rescue board    |
 
 ## Button action_ids
 
@@ -48,6 +51,7 @@ weekly_totals() -> list
 | checkin_ate  | product_id | handlers.on_checkin_ate  |
 | checkin_some | product_id | handlers.on_checkin_some |
 | checkin_none | product_id | handlers.on_checkin_none |
+| claim        | product_id | handlers.on_claim        |
 
 ## Modal callback_ids
 

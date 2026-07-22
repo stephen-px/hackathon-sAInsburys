@@ -83,45 +83,35 @@ def register(app):
         ack()
         _run(respond, lambda: _record_checkin(respond, body, fraction=0.0))
 
-    # ── /demo-rescue (posts public rescue board + personalised DMs) ──────────────
+    # ── /demo-rescue (mirrors the real Fri 11:30 trigger) ───────────────────────
 
     @app.command("/demo-rescue")
     def demo_rescue(ack, respond, client, body):
         ack()
-        channel = body["channel_id"]
+        _run(respond, lambda: rescue.post_board(client, body["channel_id"]))
 
-        def _go():
-            from slack_surface import blocks as blk
-            lots = store.leftovers()
-            if not lots:
-                client.chat_postMessage(channel=channel,
-                                        text="🎉 Nothing to rescue — the fridge is clear!")
-                respond({"text": "Fridge clear, nothing to rescue.",
+    @app.action("claim")
+    def on_claim(ack, respond, body, client):
+        ack()
+
+        def _claim():
+            product_id = int(body["actions"][0]["value"])
+            user = body["user"]["id"]
+            try:
+                result = store.claim_product(product_id, user)
+            except ValueError:
+                respond({"text": "😅 Too slow — nothing left of that one. "
+                                 "Run `/demo-rescue` for the latest board.",
                          "response_type": "ephemeral", "replace_original": False})
                 return
             client.chat_postMessage(
-                channel=channel,
-                text="🛟 Rescue Board — save it from the bin!",
-                blocks=blk.rescue_board_blocks(lots),
+                channel=body["channel"]["id"],
+                thread_ts=body["message"]["ts"],
+                text="🛟 <@%s> rescued *%s* — £%.2f saved from the bin! 💚" % (
+                    user, result["name"], result["value"]),
             )
-            respond({"text": "Rescue board posted with %d item(s)." % len(lots),
-                     "response_type": "ephemeral", "replace_original": False})
 
-        _run(respond, _go)
-
-    @app.action("claim_lot")
-    def on_claim_lot(ack, respond, body, client):
-        ack()
-
-        def _go():
-            lot_id = int(body["actions"][0]["value"])
-            user = body["user"]["id"]
-            result = store.claim_lot(lot_id, user)
-            respond({"text": "🙌 *%s* claimed! You just saved *£%.2f* from the bin." % (
-                         result["name"], result["value"]),
-                     "response_type": "in_channel", "replace_original": False})
-
-        _run(respond, _go)
+        _run(respond, _claim)
 
     # ── /demo-sweep (end-of-week waste sweep + digest) ────────────────────────────
 
