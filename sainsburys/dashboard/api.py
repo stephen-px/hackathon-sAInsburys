@@ -91,6 +91,11 @@ def index():
     return send_file(os.path.join(os.path.dirname(__file__), "index.html"))
 
 
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    return send_file(os.path.join(os.path.dirname(__file__), "assets", filename))
+
+
 # ── REST endpoints ────────────────────────────────────────────────────────────
 
 @app.route("/api/stats")

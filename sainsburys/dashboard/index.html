@@ -10,159 +10,168 @@
     @import url('https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-sans/style.css');
     @import url('https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-mono/style.css');
 
-    /* ── PX Kinetic — semantic tokens (dark default) ── */
     :root {
-      --color-key-default:              #ffffff;
-      --color-key-primary:              #578cff;
-      --color-key-error:                #ff5359;
-      --color-key-success:              #05a831;
-      --color-key-warning:              #e96d00;
-      --color-border:                   #aaabb1;
-      --color-border-subtle:            #2e3035;
-      --color-surface-0:                #111318;
-      --color-surface-1:                #191c20;
-      --color-surface-2:                #37393e;
-      --color-surface-canvas:           #111318;
-      --color-on-surface:               #ffffff;
-      --color-on-surface-subtle:        #aaabb1;
-      --color-on-primary-container:     #ffffff;
-      --color-container-surface:        #1d2024;
-      --color-container-surface-high:   #32353a;
-      --color-container-surface-low:    #0c0e13;
-      --color-container-primary:        #006efe;
-      --color-container-error:          #ee0033;
-      --color-state-hover:              rgba(255,255,255,0.08);
-      --color-state-selected:           rgba(255,255,255,0.16);
-      --color-elevation-inset:          rgba(255,255,255,0.16);
-      --color-elevation-2-shadow:       rgba(0,0,0,0.16);
+      --color-key-primary:            #578cff;
+      --color-key-error:              #ff5359;
+      --color-key-success:            #05a831;
+      --color-key-warning:            #e96d00;
+      --color-border:                 #aaabb1;
+      --color-border-subtle:          #2e3035;
+      --color-surface-1:              #191c20;
+      --color-surface-canvas:         #0c0e13;
+      --color-on-surface:             #ffffff;
+      --color-on-surface-subtle:      #aaabb1;
+      --color-container-surface:      #1d2024;
+      --color-container-surface-low:  #0c0e13;
+      --color-container-surface-high: #32353a;
+      --color-elevation-inset:        rgba(255,255,255,0.08);
+      --color-elevation-2-shadow:     rgba(0,0,0,0.32);
     }
-
     html.light {
-      --color-key-primary:              #006efe;
-      --color-key-error:                #ee0033;
-      --color-key-warning:              #e96d00;
-      --color-border:                   #45474c;
-      --color-border-subtle:            #d6d7dd;
-      --color-surface-0:                #ffffff;
-      --color-surface-1:                #f3f3fa;
-      --color-surface-canvas:           #f9f9ff;
-      --color-on-surface:               #111318;
-      --color-on-surface-subtle:        #5c5e64;
-      --color-on-primary-container:     #f3f3fa;
-      --color-container-surface:        #ffffff;
-      --color-container-surface-high:   #e1e2e9;
-      --color-container-surface-low:    #ededf4;
-      --color-state-hover:              rgba(46,54,70,0.04);
-      --color-state-selected:           rgba(46,54,70,0.12);
-      --color-elevation-inset:          rgba(0,0,0,0.16);
-      --color-elevation-2-shadow:       rgba(0,0,0,0.08);
+      --color-key-primary:            #006efe;
+      --color-key-error:              #ee0033;
+      --color-key-warning:            #e96d00;
+      --color-border-subtle:          #d6d7dd;
+      --color-surface-1:              #f3f3fa;
+      --color-surface-canvas:         #f0f0f8;
+      --color-on-surface:             #111318;
+      --color-on-surface-subtle:      #5c5e64;
+      --color-container-surface:      #ffffff;
+      --color-container-surface-low:  #ededf4;
+      --color-container-surface-high: #e1e2e9;
+      --color-elevation-inset:        rgba(0,0,0,0.1);
+      --color-elevation-2-shadow:     rgba(0,0,0,0.08);
     }
 
-    *, *::before, *::after { box-sizing: border-box; }
-
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      margin: 0;
       font-family: 'Geist', sans-serif;
       background: var(--color-surface-canvas);
       color: var(--color-on-surface);
       font-size: 13px;
-      line-height: 16px;
+      line-height: 1.4;
     }
-
     * { scrollbar-width: thin; scrollbar-color: #525252 transparent; }
     *::-webkit-scrollbar { width: 4px; height: 4px; }
-    *::-webkit-scrollbar-track { background: transparent; }
     *::-webkit-scrollbar-thumb { background: #525252; border-radius: 9999px; }
-
-    .mi { font-family: 'Material Icons Outlined'; font-size: 16px; font-style: normal;
-          line-height: 1; display: inline-block; vertical-align: middle; user-select: none; }
+    .mi {
+      font-family: 'Material Icons Outlined';
+      font-size: 16px; font-style: normal; line-height: 1;
+      display: inline-block; vertical-align: middle; user-select: none;
+    }
 
     @keyframes float-up {
       0%   { opacity: 1; transform: translateY(0) translateX(-50%); }
-      80%  { opacity: 0.9; }
-      100% { opacity: 0; transform: translateY(-72px) translateX(-50%); }
+      100% { opacity: 0; transform: translateY(-90px) translateX(-50%); }
     }
-
-    @keyframes count-tick {
+    @keyframes count-bounce {
       0%   { transform: scale(1); }
-      15%  { transform: scale(1.04); }
-      100% { transform: scale(1); }
+      20%  { transform: scale(1.08) translateY(-4px); }
+      100% { transform: scale(1) translateY(0); }
     }
-
-    @keyframes pulse-danger {
-      0%, 100% { box-shadow: 0 0 0 1px rgba(255,83,89,0.25), inset 0 0 0 1px rgba(255,255,255,0.05); }
-      50%       { box-shadow: 0 0 0 1px rgba(255,83,89,0.7),  inset 0 0 0 1px rgba(255,255,255,0.05); }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(255,83,89,0.2), inset 0 0 0 1px rgba(255,255,255,0.04); }
+      50%       { box-shadow: 0 0 0 2px rgba(255,83,89,0.6), inset 0 0 0 1px rgba(255,255,255,0.04); }
     }
-
-    @keyframes slide-in {
-      from { opacity: 0; transform: translateY(8px); }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(100px) scale(0.92); }
+      to   { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    @keyframes ripple {
+      0%   { transform: scale(0); opacity: 0.7; }
+      100% { transform: scale(4); opacity: 0; }
+    }
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(12px); }
       to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes feed-enter {
+      from { opacity: 0; transform: translateY(-6px); max-height: 0; }
+      to   { opacity: 1; transform: translateY(0); max-height: 60px; }
+    }
+    @keyframes glow {
+      0%, 100% { opacity: 0.07; }
+      50%       { opacity: 0.18; }
+    }
+    @keyframes hp-flash {
+      0%, 100% { opacity: 0.4; }
+      50%       { opacity: 1; }
+    }
+    @keyframes xp-grow {
+      from { width: 0%; }
     }
   </style>
 </head>
 <body>
   <div id="root"></div>
+  <canvas id="ccanvas" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></canvas>
 
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
-    // ── Design helpers ────────────────────────────────────────────────────────
-
+    /* ── Design helpers ─────────────────────────────────────────────────── */
     const card = (extra = {}) => ({
       background: 'var(--color-container-surface)',
-      borderRadius: 8,
-      boxShadow: '0 2px 4px var(--color-elevation-2-shadow), inset 0 0 0 1px var(--color-elevation-inset)',
+      borderRadius: 10,
+      boxShadow: '0 4px 16px var(--color-elevation-2-shadow), inset 0 0 0 1px var(--color-elevation-inset)',
       ...extra,
     });
+    const fmt  = n => '£' + Number(n).toFixed(2);
+    const Icon = ({ name, size = 16, color }) =>
+      <span className="mi" style={{ fontSize: size, color }}>{name}</span>;
 
-    const fmt = (n) => '£' + Number(n).toFixed(2);
-
-    function Icon({ name, size = 16, color }) {
-      return <span className="mi" style={{ fontSize: size, color }}>{name}</span>;
+    function PXMark({ size = 22 }) {
+      return <img src="/assets/px-logo.png" width={size} height={size} style={{ display:'block', objectFit:'contain' }} alt="PX" />;
     }
 
-    // ── Mock data ─────────────────────────────────────────────────────────────
+    /* ── XP / Level system ──────────────────────────────────────────────── */
+    const LEVELS = [
+      { name: 'Sprout',   min: 0,    max: 99,   emoji: '🌱', color: '#70D913', bg: 'rgba(112,217,19,0.15)' },
+      { name: 'Seedling', min: 100,  max: 249,  emoji: '🌿', color: '#3396FF', bg: 'rgba(51,150,255,0.15)' },
+      { name: 'Grower',   min: 250,  max: 499,  emoji: '🌳', color: '#578cff', bg: 'rgba(87,140,255,0.15)' },
+      { name: 'Champion', min: 500,  max: 999,  emoji: '⚡', color: '#e96d00', bg: 'rgba(233,109,0,0.15)'  },
+      { name: 'Legend',   min: 1000, max: 9999, emoji: '👑', color: '#DC9E17', bg: 'rgba(220,158,23,0.15)' },
+    ];
+    function getLevel(xp) { return LEVELS.find(l => xp >= l.min && xp <= l.max) || LEVELS[LEVELS.length - 1]; }
+    function xpFromSaved(saved) { return Math.round(saved * 10); }
 
+    /* ── Mock data ──────────────────────────────────────────────────────── */
+    const MOCK_NAMES = ['Alice Chen','Bob Smith','Carol Jones','Dave Kumar','Eve Williams','Frank Lee','Grace Park'];
     const MOCK = {
       stats: { saved_week: 47.30, items_rescued: 12, pending_orders: 1, active_claimers: 7 },
       leaderboard: [
-        { slack_id: 'U001', name: 'Alice Chen',   saved: 18.50 },
-        { slack_id: 'U002', name: 'Bob Smith',    saved: 12.30 },
-        { slack_id: 'U003', name: 'Carol Jones',  saved:  9.80 },
-        { slack_id: 'U004', name: 'Dave Kumar',   saved:  4.20 },
-        { slack_id: 'U005', name: 'Eve Williams', saved:  2.50 },
+        { slack_id: 'U001', name: 'Alice Chen',   saved: 18.50, streak: 4 },
+        { slack_id: 'U002', name: 'Bob Smith',    saved: 12.30, streak: 2 },
+        { slack_id: 'U003', name: 'Carol Jones',  saved:  9.80, streak: 3 },
+        { slack_id: 'U004', name: 'Dave Kumar',   saved:  4.20, streak: 1 },
+        { slack_id: 'U005', name: 'Eve Williams', saved:  2.50, streak: 1 },
       ],
       rescue: [
-        { id: 1, name: 'Hummus & Flatbreads',   days_left: 0, qty_remaining: 2, price: 2.50, risk_score: 6.2 },
-        { id: 2, name: 'Mixed Leaf Salad',      days_left: 1, qty_remaining: 3, price: 1.80, risk_score: 4.1 },
-        { id: 3, name: 'Chicken Caesar Wrap',   days_left: 2, qty_remaining: 1, price: 3.50, risk_score: 2.5 },
-        { id: 4, name: 'Fruit Pot',             days_left: 2, qty_remaining: 4, price: 2.00, risk_score: 2.3 },
-        { id: 5, name: 'Falafel Bowl',          days_left: 3, qty_remaining: 2, price: 4.50, risk_score: 1.8 },
-        { id: 6, name: 'Spiced Chickpea Wrap',  days_left: 4, qty_remaining: 5, price: 3.50, risk_score: 1.2 },
+        { id: 1, name: 'Hummus & Flatbreads',  days_left: 0, qty_remaining: 2, price: 2.50, risk_score: 6.2 },
+        { id: 2, name: 'Mixed Leaf Salad',     days_left: 1, qty_remaining: 3, price: 1.80, risk_score: 4.1 },
+        { id: 3, name: 'Chicken Caesar Wrap',  days_left: 2, qty_remaining: 1, price: 3.50, risk_score: 2.5 },
+        { id: 4, name: 'Fruit Pot',            days_left: 2, qty_remaining: 4, price: 2.00, risk_score: 2.3 },
+        { id: 5, name: 'Falafel Bowl',         days_left: 3, qty_remaining: 2, price: 4.50, risk_score: 1.8 },
+        { id: 6, name: 'Spiced Chickpea Wrap', days_left: 4, qty_remaining: 5, price: 3.50, risk_score: 1.2 },
       ],
       basket: {
         week: '2026-07-20',
         orders: [
-          {
-            id: 1, delivery_date: '2026-07-21', status: 'approved', total: 87.40,
+          { id: 1, delivery_date: '2026-07-21', status: 'approved', total: 87.40,
             lines: [
               { name: 'Chicken Caesar Wrap', qty: 8, unit_price: 3.50 },
               { name: 'Hummus & Flatbreads', qty: 6, unit_price: 2.50 },
               { name: 'Mixed Leaf Salad',    qty: 5, unit_price: 1.80 },
-            ],
-          },
-          {
-            id: 2, delivery_date: '2026-07-23', status: 'draft', total: 62.20,
+            ] },
+          { id: 2, delivery_date: '2026-07-23', status: 'draft', total: 62.20,
             lines: [
-              { name: 'Falafel Bowl',               qty: 6, unit_price: 4.50 },
-              { name: 'Fruit Pot',                  qty: 8, unit_price: 2.00 },
-              { name: 'Cheese & Chutney Baguette',  qty: 5, unit_price: 3.20 },
-            ],
-          },
+              { name: 'Falafel Bowl',              qty: 6, unit_price: 4.50 },
+              { name: 'Fruit Pot',                 qty: 8, unit_price: 2.00 },
+              { name: 'Cheese & Chutney Baguette', qty: 5, unit_price: 3.20 },
+            ] },
         ],
       },
       totals: [
@@ -171,287 +180,630 @@
         { week: '07-13', claimed: 38.80, wasted:  9.50 },
         { week: '07-20', claimed: 47.30, wasted:  5.20 },
       ],
+      departments: { Engineering: 32.10, Operations: 10.80, Product: 4.40 },
+      challenge: { goal: 60, label: 'Team goal: save £60 this week' },
     };
 
-    // ── Header ────────────────────────────────────────────────────────────────
+    /* ── Confetti ───────────────────────────────────────────────────────── */
+    const CC = ['#578cff','#70D913','#FF5359','#DC9E17','#e96d00','#ffffff','#3396FF','#b0e0ff'];
+    let cparts = [], craf = null;
+    function boom(cx, cy) {
+      try {
+        const cv = document.getElementById('ccanvas');
+        if (!cv) return;
+        cv.width = window.innerWidth; cv.height = window.innerHeight;
+        const x = cx != null ? cx : cv.width / 2;
+        const y = cy != null ? cy : cv.height * 0.28;
+        for (let i = 0; i < 110; i++) {
+          const a = (Math.PI * 2 * i) / 110 + (Math.random() - 0.5);
+          const s = 3 + Math.random() * 9;
+          cparts.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 5,
+            color: CC[Math.floor(Math.random()*CC.length)],
+            alpha: 1, rot: Math.random()*360, rv: (Math.random()-0.5)*14,
+            w: 5+Math.random()*6, h: 3+Math.random()*4 });
+        }
+        if (!craf) rafConfetti();
+      } catch(e) { console.error('[boom]', e.message); }
+    }
+    function rafConfetti() {
+      try {
+        const cv = document.getElementById('ccanvas');
+        if (!cv) return;
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0,0,cv.width,cv.height);
+        cparts = cparts.filter(p => p.alpha > 0.02);
+        cparts.forEach(p => {
+          p.x+=p.vx; p.y+=p.vy; p.vy+=0.28; p.vx*=0.99;
+          p.rot+=p.rv; p.alpha -= 0.011;
+          ctx.save(); ctx.globalAlpha = Math.max(0,p.alpha);
+          ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
+          ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+          ctx.restore();
+        });
+        if (cparts.length>0) { craf = requestAnimationFrame(rafConfetti); }
+        else { craf=null; ctx.clearRect(0,0,cv.width,cv.height); }
+      } catch(e) { craf=null; console.error('[rafConfetti]',e.message); }
+    }
 
-    function Header({ theme, onToggle, live }) {
+    /* ── Smooth animated counter ───────────────────────────────────────── */
+    function useSmoothVal(target, ms = 900) {
+      const [val, setVal] = useState(target);
+      const from = useRef(target);
+      const raf  = useRef(null);
+      const t0   = useRef(null);
+      useEffect(() => {
+        try {
+          const start = from.current;
+          const diff  = target - start;
+          if (Math.abs(diff) < 0.005) { setVal(target); return; }
+          t0.current = null;
+          if (raf.current) cancelAnimationFrame(raf.current);
+          function step(ts) {
+            if (!t0.current) t0.current = ts;
+            const t = Math.min((ts - t0.current) / ms, 1);
+            const e = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+            setVal(start + diff * e);
+            if (t < 1) { raf.current = requestAnimationFrame(step); }
+            else { from.current = target; raf.current = null; }
+          }
+          raf.current = requestAnimationFrame(step);
+          return () => { if (raf.current) cancelAnimationFrame(raf.current); };
+        } catch(e) { console.error('[useSmoothVal]',e.message); }
+      }, [target]);
+      return val;
+    }
+
+    /* ── Milestones ─────────────────────────────────────────────────────── */
+    const MILES = [50,100,150,200,300,500];
+    function nextMile(v) { return MILES.find(m => m > v) || MILES[MILES.length-1]; }
+
+    /* ── Toast ──────────────────────────────────────────────────────────── */
+    function Toast({ t, onClose }) {
+      useEffect(() => { const id = setTimeout(onClose, 4000); return ()=>clearTimeout(id); }, []);
+      return (
+        <div onClick={onClose} style={{
+          background: 'var(--color-container-surface)',
+          borderRadius: 10,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--color-key-primary)',
+          padding: '14px 18px',
+          display: 'flex', alignItems: 'center', gap: 14,
+          animation: 'toast-in 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+          cursor: 'pointer', minWidth: 280, maxWidth: 340,
+        }}>
+          <span style={{ fontSize: 32, lineHeight: 1 }}>{t.emoji}</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-key-primary)', marginBottom: 3 }}>{t.title}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-on-surface-subtle)' }}>{t.body}</div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    function Header({ theme, onToggle, live, onSim }) {
+      const [h, setH] = useState(false);
       return (
         <header style={{
-          height: 48,
+          height: 54,
           background: 'var(--color-surface-1)',
           borderBottom: '1px solid var(--color-border-subtle)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 28px', position: 'sticky', top: 0, zIndex: 100,
+          backdropFilter: 'blur(12px)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{
-              fontWeight: 700,
-              fontSize: 12,
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 6,
               background: 'var(--color-key-primary)',
-              color: '#111318',
-              padding: '2px 6px',
-              borderRadius: 4,
-              letterSpacing: '0.02em',
-            }}>PX</span>
-            <span style={{ fontWeight: 500, fontSize: 14 }}>sAInsburys</span>
-            <span style={{ color: 'var(--color-border-subtle)', fontSize: 18, lineHeight: 1 }}>·</span>
-            <span style={{ color: 'var(--color-on-surface-subtle)', fontSize: 13 }}>Waste the Difference</span>
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <PXMark size={24} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.1 }}>sAInsburys</div>
+              <div style={{ fontSize: 11, color: 'var(--color-on-surface-subtle)', letterSpacing: '0.04em' }}>WASTE THE DIFFERENCE</div>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={onSim}
+              onMouseEnter={()=>setH(true)}
+              onMouseLeave={()=>setH(false)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '0 16px', height: 34,
+                background: h ? 'rgba(87,140,255,0.22)' : 'rgba(87,140,255,0.1)',
+                border: 'none',
+                boxShadow: '0 0 0 1.5px var(--color-key-primary)',
+                borderRadius: 6,
+                color: 'var(--color-key-primary)',
+                cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                fontFamily: "'Geist', sans-serif",
+                transition: 'background 0.15s, box-shadow 0.15s',
+                letterSpacing: '0.02em',
+              }}
+            >
+              <Icon name="bolt" size={15} color="var(--color-key-primary)" />
+              Simulate Claim
+            </button>
+
             {live && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <div style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: 'var(--color-key-success)',
-                  boxShadow: '0 0 0 2px rgba(5,168,49,0.3)',
-                }} />
-                <span style={{ fontSize: 11, color: 'var(--color-key-success)' }}>Live</span>
+                  width:7, height:7, borderRadius:'50%',
+                  background:'var(--color-key-success)',
+                  boxShadow:'0 0 0 3px rgba(5,168,49,0.25)',
+                }}/>
+                <span style={{ fontSize:11, color:'var(--color-key-success)', fontWeight:600 }}>LIVE</span>
               </div>
             )}
-            <button
-              onClick={onToggle}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 32, height: 32,
-                background: 'transparent', border: 'none',
-                borderRadius: 4, color: 'var(--color-on-surface-subtle)',
-                cursor: 'pointer',
-              }}
-              title="Toggle theme"
-            >
-              <Icon name={theme === 'dark' ? 'light_mode' : 'dark_mode'} size={18} />
+
+            <button onClick={onToggle} style={{
+              width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center',
+              background:'transparent', border:'none', borderRadius:6,
+              color:'var(--color-on-surface-subtle)', cursor:'pointer',
+            }}>
+              <Icon name={theme==='dark'?'light_mode':'dark_mode'} size={18} />
             </button>
           </div>
         </header>
       );
     }
 
-    // ── Hero counter ──────────────────────────────────────────────────────────
-
+    /* ── Float-up ───────────────────────────────────────────────────────── */
     function FloatUp({ value, onDone }) {
-      useEffect(() => {
-        const t = setTimeout(onDone, 2200);
-        return () => clearTimeout(t);
-      }, []);
+      useEffect(() => { const t = setTimeout(onDone, 2000); return ()=>clearTimeout(t); }, []);
       return (
         <span style={{
-          position: 'absolute', left: '50%', bottom: 48,
-          pointerEvents: 'none',
-          color: 'var(--color-key-success)',
-          fontSize: 22, fontWeight: 600,
-          animation: 'float-up 2.2s ease-out forwards',
-          whiteSpace: 'nowrap',
-          textShadow: '0 0 20px rgba(5,168,49,0.5)',
-        }}>
-          +{fmt(value)}
-        </span>
+          position:'absolute', left:'50%', bottom:56,
+          pointerEvents:'none',
+          color:'var(--color-key-success)',
+          fontSize:26, fontWeight:800,
+          animation:'float-up 2s ease-out forwards',
+          whiteSpace:'nowrap',
+          textShadow:'0 0 28px rgba(5,168,49,0.7)',
+          zIndex:2, letterSpacing:'-0.01em',
+        }}>+{fmt(value)}</span>
       );
     }
 
-    function HeroCounter({ total, floats, onExpireFloat }) {
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    function Hero({ total, floats, onExpireFloat }) {
+      const smooth = useSmoothVal(total, 900);
       const numRef = useRef(null);
-      const prevTotal = useRef(total);
-
+      const prev   = useRef(total);
       useEffect(() => {
         try {
-          if (numRef.current && total !== prevTotal.current) {
-            numRef.current.style.animation = 'none';
+          if (numRef.current && total !== prev.current) {
+            numRef.current.style.animation='none';
             void numRef.current.offsetHeight;
-            numRef.current.style.animation = 'count-tick 0.5s ease';
-            prevTotal.current = total;
+            numRef.current.style.animation='count-bounce 0.55s cubic-bezier(0.34,1.56,0.64,1)';
+            prev.current = total;
           }
-        } catch (e) {
-          console.error('[HeroCounter] anim error:', e.message);
-        }
+        } catch(e) { console.error('[Hero]',e.message); }
       }, [total]);
+
+      const mile    = nextMile(total);
+      const prevM   = MILES[MILES.indexOf(mile)-1] || 0;
+      const milePct = Math.min(((total - prevM) / (mile - prevM)) * 100, 100);
 
       return (
         <div style={{
-          textAlign: 'center',
-          padding: '44px 24px 36px',
-          borderRadius: 8,
-          position: 'relative',
-          overflow: 'hidden',
-          background: 'var(--color-container-surface)',
-          boxShadow: '0 2px 4px var(--color-elevation-2-shadow), inset 0 0 0 1px var(--color-elevation-inset)',
+          textAlign:'center', padding:'52px 32px 38px',
+          borderRadius:12, position:'relative', overflow:'hidden',
+          background:'var(--color-container-surface)',
+          boxShadow:'0 8px 32px var(--color-elevation-2-shadow), inset 0 0 0 1px var(--color-elevation-inset)',
         }}>
           {/* Radial glow */}
           <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none',
-            background: 'radial-gradient(ellipse 55% 100% at 50% 100%, rgba(87,140,255,0.1) 0%, transparent 70%)',
-          }} />
+            position:'absolute', inset:0, pointerEvents:'none',
+            background:'radial-gradient(ellipse 70% 80% at 50% 110%, rgba(87,140,255,0.18) 0%, transparent 70%)',
+            animation:'glow 4s ease-in-out infinite',
+          }}/>
 
-          <div style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-on-surface-subtle)', marginBottom: 16, position: 'relative' }}>
-            Rescued this week
+          <div style={{
+            fontSize:11, letterSpacing:'0.14em', textTransform:'uppercase',
+            color:'var(--color-on-surface-subtle)', marginBottom:18, position:'relative',
+          }}>
+            Total rescued this week
           </div>
 
-          <div
-            ref={numRef}
-            style={{
-              fontSize: 80,
-              fontWeight: 300,
-              letterSpacing: '-0.025em',
-              lineHeight: 1,
-              color: 'var(--color-key-primary)',
-              fontFamily: "'Geist', sans-serif",
-              position: 'relative',
-            }}
-          >
-            {fmt(total)}
+          <div ref={numRef} style={{
+            fontSize:96, fontWeight:200, letterSpacing:'-0.04em', lineHeight:1,
+            color:'var(--color-key-primary)', position:'relative',
+            fontFamily:"'Geist', sans-serif",
+            textShadow:'0 0 80px rgba(87,140,255,0.3)',
+          }}>
+            {fmt(smooth)}
           </div>
 
-          <div style={{ fontSize: 13, color: 'var(--color-on-surface-subtle)', marginTop: 14, position: 'relative' }}>
-            in food saved from the bin
+          <div style={{ fontSize:14, color:'var(--color-on-surface-subtle)', marginTop:16, position:'relative' }}>
+            saved from the bin 🎉 — helping the planet, one falafel at a time
           </div>
 
-          {floats.map(f => (
-            <FloatUp key={f.id} value={f.value} onDone={() => onExpireFloat(f.id)} />
-          ))}
+          {/* Milestone bar */}
+          <div style={{ maxWidth:480, margin:'28px auto 0', position:'relative' }}>
+            <div style={{
+              display:'flex', justifyContent:'space-between',
+              fontSize:11, color:'var(--color-on-surface-subtle)', marginBottom:8,
+            }}>
+              <span>Next milestone</span>
+              <span style={{ color:'var(--color-key-primary)', fontWeight:700 }}>
+                {fmt(total)} / {fmt(mile)}
+              </span>
+            </div>
+            <div style={{ height:8, background:'var(--color-border-subtle)', borderRadius:99, overflow:'hidden', position:'relative' }}>
+              <div style={{
+                height:'100%', width:`${milePct}%`, borderRadius:99,
+                background:'linear-gradient(90deg, var(--color-key-primary) 0%, #70D913 100%)',
+                transition:'width 1.1s cubic-bezier(0.4,0,0.2,1)',
+                boxShadow:'0 0 16px rgba(87,140,255,0.5)',
+              }}/>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginTop:6 }}>
+              {MILES.filter(m => m <= mile * 1.2 && m >= prevM).map(m => {
+                const hit = total >= m;
+                const p   = Math.min(((m - prevM) / (mile - prevM)) * 100, 100);
+                return (
+                  <div key={m} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                    <div style={{ width:2, height:6, background: hit ? 'var(--color-key-primary)' : 'var(--color-border-subtle)', borderRadius:1 }}/>
+                    <span style={{ fontSize:9, fontWeight: hit?700:400, color: hit ? 'var(--color-key-primary)' : 'var(--color-on-surface-subtle)' }}>
+                      {hit ? '✓' : ''}{fmt(m)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {floats.map(f => <FloatUp key={f.id} value={f.value} onDone={()=>onExpireFloat(f.id)}/>)}
         </div>
       );
     }
 
-    // ── Stat tiles ────────────────────────────────────────────────────────────
-
-    function StatTile({ icon, value, label, accent }) {
+    /* ── Stat tiles ─────────────────────────────────────────────────────── */
+    function StatTile({ icon, value, label, accent, sub }) {
       return (
         <div style={{
-          ...card({ padding: '14px 16px' }),
-          display: 'flex', flexDirection: 'column', gap: 10,
-          borderTop: `2px solid ${accent}`,
-          animation: 'slide-in 0.4s ease both',
+          ...card({ padding:'18px 20px' }),
+          display:'flex', flexDirection:'column', gap:10,
+          borderTop:`2px solid ${accent}`,
+          animation:'slide-up 0.4s ease both',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: 'var(--color-on-surface-subtle)', fontWeight: 500, letterSpacing: '0.02em' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontSize:11, color:'var(--color-on-surface-subtle)', fontWeight:500, letterSpacing:'0.04em', textTransform:'uppercase' }}>
               {label}
             </span>
-            <Icon name={icon} size={16} color={accent} />
+            <Icon name={icon} size={17} color={accent} />
           </div>
-          <div style={{ fontSize: 26, fontWeight: 300, letterSpacing: '-0.01em', lineHeight: 1 }}>
+          <div style={{ fontSize:32, fontWeight:300, letterSpacing:'-0.02em', lineHeight:1, color:'var(--color-on-surface)' }}>
             {value}
           </div>
+          {sub && <div style={{ fontSize:11, color:'var(--color-on-surface-subtle)', borderTop:'1px solid var(--color-border-subtle)', paddingTop:8 }}>{sub}</div>}
         </div>
       );
     }
 
-    function StatTiles({ stats }) {
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          <StatTile icon="savings"       value={fmt(stats.saved_week)}    label="Saved this week"   accent="var(--color-key-success)" />
-          <StatTile icon="recycling"     value={stats.items_rescued}      label="Items rescued"     accent="#70D913" />
-          <StatTile icon="shopping_cart" value={stats.pending_orders}     label="Pending approval"  accent="var(--color-key-warning)" />
-          <StatTile icon="group"         value={stats.active_claimers}    label="Active claimers"   accent="var(--color-key-primary)" />
-        </div>
-      );
-    }
-
-    // ── Fridge health bar ─────────────────────────────────────────────────────
-
-    function FridgeHealthBar({ rescue }) {
+    /* ── Fridge HP ──────────────────────────────────────────────────────── */
+    function FridgeHP({ rescue }) {
       const expiring = rescue.filter(r => r.days_left <= 1).length;
-      const safe     = rescue.filter(r => r.days_left >= 3).length;
       const total    = rescue.length || 1;
-      const pct      = Math.round(((total - expiring) / total) * 100);
-      const barColor = pct > 65 ? 'var(--color-key-success)' : pct > 35 ? 'var(--color-key-warning)' : 'var(--color-key-error)';
-      const status   = pct > 65 ? 'Good' : pct > 35 ? 'At risk' : 'Critical';
-
+      const hp       = Math.round(((total - expiring) / total) * 100);
+      const color    = hp > 65 ? '#70D913' : hp > 35 ? 'var(--color-key-warning)' : 'var(--color-key-error)';
+      const label    = hp > 65 ? 'Healthy' : hp > 35 ? 'At Risk' : 'Critical';
+      const TICKS    = [0,20,40,60,80,100];
       return (
-        <div style={{ ...card({ padding: '14px 16px' }) }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="kitchen" size={16} color={barColor} />
-              <span style={{ fontSize: 13, fontWeight: 500 }}>Fridge Health</span>
+        <div style={{ ...card({ padding:'18px 22px' }) }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <Icon name="kitchen" size={17} color={color} />
+              <span style={{ fontWeight:600, fontSize:13 }}>Fridge HP</span>
+              <span style={{ fontSize:36, fontWeight:200, lineHeight:1, color, fontFamily:"'Geist Mono',monospace" }}>{hp}</span>
+              <span style={{ fontSize:13, color:'var(--color-on-surface-subtle)', marginTop:4 }}>/ 100</span>
               <span style={{
-                fontSize: 11, fontWeight: 600, padding: '1px 8px',
-                borderRadius: 9999,
-                background: barColor, color: '#111318',
-              }}>{status}</span>
+                fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:99,
+                background:color, color:'#111318', marginLeft:4,
+              }}>{label}</span>
             </div>
-            <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--color-on-surface-subtle)' }}>
-              <span style={{ color: 'var(--color-key-error)' }}>{expiring} expiring soon</span>
-              <span>{safe} safe 3+ days</span>
+            <div style={{ display:'flex', gap:20, fontSize:11, color:'var(--color-on-surface-subtle)' }}>
+              <span style={{ color:'var(--color-key-error)', fontWeight:600 }}>{expiring} expiring soon</span>
+              <span>{total-expiring} safe</span>
             </div>
           </div>
-          <div style={{ height: 5, background: 'var(--color-border-subtle)', borderRadius: 9999, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%',
-              width: `${pct}%`,
-              background: barColor,
-              borderRadius: 9999,
-              transition: 'width 800ms cubic-bezier(0.4,0,0.2,1)',
-            }} />
+          <div style={{ position:'relative' }}>
+            <div style={{ height:12, background:'var(--color-border-subtle)', borderRadius:99, overflow:'hidden' }}>
+              <div style={{
+                height:'100%', width:`${hp}%`, borderRadius:99,
+                background:`linear-gradient(90deg, ${hp<=35?'var(--color-key-error)':'var(--color-key-success)'} 0%, ${color} 100%)`,
+                transition:'width 900ms cubic-bezier(0.4,0,0.2,1)',
+                boxShadow:`0 0 18px ${color}55`,
+              }}/>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
+              {TICKS.map(t => (
+                <div key={t} style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+                  <div style={{
+                    width:1, height:5,
+                    background: hp>=t ? color : 'var(--color-border-subtle)',
+                    animation: hp>=t && hp<t+20 ? 'hp-flash 1.2s ease-in-out infinite' : 'none',
+                  }}/>
+                  <span style={{ fontSize:9, color:'var(--color-on-surface-subtle)', marginTop:2 }}>{t}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       );
     }
 
-    // ── Rescue board ──────────────────────────────────────────────────────────
+    /* ── Activity feed ──────────────────────────────────────────────────── */
+    const EV_ICONS = { claimed:'🥗', consumed:'✅', wasted:'😬' };
+    function ActivityFeed({ events }) {
+      const ref = useRef(null);
+      useEffect(() => { if (ref.current) ref.current.scrollTop = 0; }, [events.length]);
+      return (
+        <div style={{ ...card({ padding:0, overflow:'hidden', width:272, flexShrink:0 }) }}>
+          <div style={{
+            padding:'13px 18px', borderBottom:'1px solid var(--color-border-subtle)',
+            display:'flex', alignItems:'center', gap:8,
+          }}>
+            <Icon name="bolt" size={15} color="var(--color-key-primary)" />
+            <span style={{ fontWeight:600, fontSize:13 }}>Live Activity</span>
+            <span style={{
+              marginLeft:'auto', fontSize:10, fontWeight:700,
+              padding:'1px 7px', borderRadius:99,
+              background:'rgba(87,140,255,0.15)', color:'var(--color-key-primary)',
+              letterSpacing:'0.05em',
+            }}>LIVE</span>
+          </div>
+          <div ref={ref} style={{ maxHeight:310, overflowY:'auto', padding:'4px 0' }}>
+            {events.length === 0 && (
+              <div style={{ padding:'28px 18px', color:'var(--color-on-surface-subtle)', fontSize:12, textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>👀</div>
+                Watching for activity…
+              </div>
+            )}
+            {events.map((ev, i) => (
+              <div key={ev.id} style={{
+                padding:'9px 18px', display:'flex', alignItems:'center', gap:10,
+                borderBottom: i < events.length-1 ? '1px solid var(--color-border-subtle)' : 'none',
+                animation: i===0 ? 'feed-enter 0.3s ease' : 'none',
+              }}>
+                <span style={{ fontSize:18, flexShrink:0 }}>{EV_ICONS[ev.kind] || '📦'}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {ev.user}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--color-on-surface-subtle)', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {ev.item}
+                  </div>
+                </div>
+                <span style={{
+                  fontFamily:"'Geist Mono',monospace", fontSize:12, flexShrink:0,
+                  color: ev.kind==='claimed' ? 'var(--color-key-success)' : 'var(--color-on-surface-subtle)',
+                  fontWeight:600,
+                }}>+{fmt(ev.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
 
+    /* ── Department Battle ──────────────────────────────────────────────── */
+    function DeptBattle({ departments }) {
+      const entries  = Object.entries(departments).sort((a,b)=>b[1]-a[1]);
+      const totalVal = entries.reduce((s,[,v])=>s+v,0)||1;
+      const COLORS   = ['var(--color-key-primary)','#70D913','#e96d00','#FF5359'];
+      const winner   = entries[0][0];
+      return (
+        <div style={{ ...card({ padding:'18px 22px', flex:1 }) }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <Icon name="groups" size={16} color="var(--color-key-primary)" />
+              <span style={{ fontWeight:600, fontSize:13 }}>Department Battle</span>
+            </div>
+            <span style={{ fontSize:12, color:'#DC9E17', fontWeight:700 }}>🏆 {winner} is winning</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {entries.map(([dept, val], i) => {
+              const pct = (val / totalVal) * 100;
+              return (
+                <div key={dept}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                    <span style={{ fontSize:13, fontWeight: i===0 ? 700 : 400 }}>{dept}</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:12, color:COLORS[i], fontWeight:600 }}>
+                        {fmt(val)}
+                      </span>
+                      <span style={{ fontSize:11, color:'var(--color-on-surface-subtle)' }}>
+                        {Math.round(pct)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ height:10, background:'var(--color-border-subtle)', borderRadius:99, overflow:'hidden' }}>
+                    <div style={{
+                      height:'100%', width:`${pct}%`, borderRadius:99,
+                      background:COLORS[i],
+                      transition:'width 1.3s cubic-bezier(0.4,0,0.2,1)',
+                      boxShadow: i===0 ? `0 0 12px ${COLORS[i]}55` : 'none',
+                    }}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{
+            marginTop:16, padding:'10px 14px', borderRadius:8,
+            background:'var(--color-container-surface-low)',
+            fontSize:11, color:'var(--color-on-surface-subtle)', textAlign:'center',
+          }}>
+            💪 Claim an item to push your department ahead
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Weekly challenge ───────────────────────────────────────────────── */
+    function WeeklyChallenge({ saved, challenge }) {
+      const pct  = Math.min((saved / challenge.goal) * 100, 100);
+      const done = saved >= challenge.goal;
+      return (
+        <div style={{ ...card({ padding:'18px 22px', width:280, flexShrink:0 }) }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+            <Icon name="military_tech" size={16} color="#DC9E17" />
+            <span style={{ fontWeight:600, fontSize:13 }}>Weekly Challenge</span>
+            {done && (
+              <span style={{
+                marginLeft:'auto', fontSize:10, fontWeight:700,
+                padding:'2px 8px', borderRadius:99,
+                background:'rgba(5,168,49,0.18)', color:'var(--color-key-success)',
+              }}>✓ COMPLETE</span>
+            )}
+          </div>
+          <div style={{ fontSize:12, color:'var(--color-on-surface-subtle)', marginBottom:14 }}>{challenge.label}</div>
+          <div style={{ height:10, background:'var(--color-border-subtle)', borderRadius:99, overflow:'hidden', marginBottom:8 }}>
+            <div style={{
+              height:'100%', width:`${pct}%`, borderRadius:99,
+              background: done
+                ? 'linear-gradient(90deg, var(--color-key-success), #70D913)'
+                : 'linear-gradient(90deg, var(--color-key-primary), #70D913)',
+              transition:'width 1.2s cubic-bezier(0.4,0,0.2,1)',
+              boxShadow: done ? '0 0 14px rgba(5,168,49,0.5)' : 'none',
+            }}/>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--color-on-surface-subtle)' }}>
+            <span style={{ color: done ? 'var(--color-key-success)' : 'var(--color-on-surface)', fontWeight:600 }}>
+              {fmt(saved)}
+            </span>
+            <span>Goal {fmt(challenge.goal)}</span>
+          </div>
+          <div style={{
+            marginTop:14, padding:'10px 14px', borderRadius:8,
+            background:'var(--color-container-surface-low)',
+            fontSize:11, display:'flex', alignItems:'center', gap:6,
+          }}>
+            <span>⚡</span>
+            <span style={{ color:'var(--color-on-surface-subtle)' }}>
+              Complete for <span style={{ color:'#DC9E17', fontWeight:700 }}>+500 bonus XP</span>
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Rescue board ───────────────────────────────────────────────────── */
     function ExpiryBadge({ days }) {
       const pill = (bg, fg, label) => (
         <span style={{
-          display: 'inline-flex', alignItems: 'center',
-          padding: '0 8px', height: 20, borderRadius: 9999,
-          background: bg, color: fg,
-          fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+          display:'inline-flex', alignItems:'center',
+          padding:'0 9px', height:22, borderRadius:99,
+          background:bg, color:fg, fontSize:11, fontWeight:700, whiteSpace:'nowrap',
         }}>{label}</span>
       );
-      if (days <= 0) return pill('var(--color-key-error)',   '#fff',                        'TODAY');
-      if (days === 1) return pill('var(--color-key-warning)', '#111318',                    '1 day');
-      if (days === 2) return pill('rgba(87,140,255,0.2)',    'var(--color-key-primary)',    '2 days');
-      return pill('var(--color-border-subtle)', 'var(--color-on-surface-subtle)', `${days}d`);
+      if (days <= 0)  return pill('var(--color-key-error)',      '#fff',                                   'TODAY');
+      if (days === 1) return pill('var(--color-key-warning)',    '#111318',                                '1 day');
+      if (days === 2) return pill('rgba(87,140,255,0.2)',        'var(--color-key-primary)',               '2 days');
+      return pill('var(--color-border-subtle)', 'var(--color-on-surface-subtle)', `${days} days`);
     }
 
-    function RescueBoard({ items }) {
+    function ClaimBtn({ item, onClaim }) {
+      const [h, setH]   = useState(false);
+      const [rip, setR] = useState(false);
+      const ref         = useRef(null);
+      function click(e) {
+        try {
+          setR(true); setTimeout(()=>setR(false), 600);
+          const r = ref.current ? ref.current.getBoundingClientRect() : { left:e.clientX, top:e.clientY, width:0, height:0 };
+          boom(r.left + r.width/2, r.top + r.height/2);
+          onClaim(item);
+        } catch(err) { console.error('[ClaimBtn]',err.message); }
+      }
       return (
-        <div style={{ ...card({ padding: 0, overflow: 'hidden', flex: 1, minWidth: 0 }) }}>
+        <button ref={ref} onClick={click}
+          onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+          style={{
+            position:'relative', overflow:'hidden',
+            display:'inline-flex', alignItems:'center', gap:5,
+            padding:'0 13px', height:28,
+            background: h ? 'rgba(5,168,49,0.22)' : 'rgba(5,168,49,0.1)',
+            border:'none',
+            boxShadow:'0 0 0 1.5px var(--color-key-success)',
+            borderRadius:6,
+            color:'var(--color-key-success)',
+            cursor:'pointer', fontSize:12, fontWeight:700,
+            fontFamily:"'Geist', sans-serif",
+            transition:'background 0.15s',
+          }}
+        >
+          {rip && <span style={{
+            position:'absolute', top:'50%', left:'50%',
+            width:36, height:36, marginTop:-18, marginLeft:-18,
+            borderRadius:'50%',
+            background:'rgba(5,168,49,0.4)',
+            animation:'ripple 0.6s ease forwards',
+            pointerEvents:'none',
+          }}/>}
+          <Icon name="volunteer_activism" size={13} color="var(--color-key-success)" />
+          Claim
+        </button>
+      );
+    }
+
+    function RescueBoard({ items, onClaim }) {
+      return (
+        <div style={{ ...card({ padding:0, overflow:'hidden', flex:1, minWidth:0 }) }}>
           <div style={{
-            padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 8,
-            borderBottom: '1px solid var(--color-border-subtle)',
+            padding:'14px 18px', borderBottom:'1px solid var(--color-border-subtle)',
+            display:'flex', alignItems:'center', gap:8,
           }}>
             <Icon name="warning" size={16} color="var(--color-key-warning)" />
-            <span style={{ fontWeight: 500, fontSize: 13 }}>Rescue Board</span>
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-on-surface-subtle)' }}>
-              {items.length} items in fridge
+            <span style={{ fontWeight:600, fontSize:13 }}>Rescue Board</span>
+            <span style={{ marginLeft:'auto', fontSize:11, color:'var(--color-on-surface-subtle)' }}>
+              {items.length} items at risk · sorted by urgency
             </span>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                  {['Item', 'Expires', 'Qty', 'At risk'].map((h, i) => (
-                    <th key={h} style={{
-                      padding: '7px 16px', textAlign: i >= 2 ? 'right' : 'left',
-                      fontSize: 11, fontWeight: 500, color: 'var(--color-on-surface-subtle)',
-                      whiteSpace: 'nowrap',
+                <tr style={{ borderBottom:'1px solid var(--color-border-subtle)', background:'var(--color-container-surface-low)' }}>
+                  {['Item','Expires','Qty','Value at risk',''].map((h,i) => (
+                    <th key={i} style={{
+                      padding:'8px 16px',
+                      textAlign: i>=2 && i<4 ? 'right' : 'left',
+                      fontSize:11, fontWeight:600,
+                      color:'var(--color-on-surface-subtle)',
+                      textTransform:'uppercase', letterSpacing:'0.04em',
                     }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, i) => {
-                  const critical = item.days_left <= 0;
-                  const rowBg = critical ? 'rgba(255,83,89,0.04)' : 'transparent';
+                  const crit = item.days_left <= 0;
                   return (
                     <tr key={item.id} style={{
-                      borderBottom: i < items.length - 1 ? '1px solid var(--color-border-subtle)' : 'none',
-                      background: rowBg,
-                      animation: critical ? 'pulse-danger 2.5s ease infinite' : 'none',
+                      borderBottom: i < items.length-1 ? '1px solid var(--color-border-subtle)' : 'none',
+                      background: crit ? 'rgba(255,83,89,0.04)' : 'transparent',
+                      animation: crit ? 'pulse-red 2.5s ease infinite' : 'none',
+                      transition:'background 0.2s',
                     }}>
-                      <td style={{ padding: '10px 16px', fontSize: 13 }}>{item.name}</td>
-                      <td style={{ padding: '10px 16px' }}><ExpiryBadge days={item.days_left} /></td>
-                      <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: "'Geist Mono', monospace", fontSize: 12, color: 'var(--color-on-surface-subtle)' }}>
-                        {item.qty_remaining}
+                      <td style={{ padding:'11px 16px', fontSize:13, fontWeight:500 }}>{item.name}</td>
+                      <td style={{ padding:'11px 16px' }}><ExpiryBadge days={item.days_left}/></td>
+                      <td style={{ padding:'11px 16px', textAlign:'right', fontFamily:"'Geist Mono',monospace", fontSize:12, color:'var(--color-on-surface-subtle)' }}>
+                        ×{item.qty_remaining}
                       </td>
-                      <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: "'Geist Mono', monospace", fontSize: 13, color: item.days_left <= 1 ? 'var(--color-key-error)' : 'var(--color-on-surface)' }}>
+                      <td style={{
+                        padding:'11px 16px', textAlign:'right',
+                        fontFamily:"'Geist Mono',monospace", fontSize:13, fontWeight:600,
+                        color: item.days_left<=1 ? 'var(--color-key-error)' : 'var(--color-on-surface)',
+                      }}>
                         {fmt(item.qty_remaining * item.price)}
+                      </td>
+                      <td style={{ padding:'11px 16px' }}>
+                        <ClaimBtn item={item} onClaim={onClaim} />
                       </td>
                     </tr>
                   );
@@ -463,297 +815,361 @@
       );
     }
 
-    // ── Leaderboard ───────────────────────────────────────────────────────────
+    /* ── XP Leaderboard ─────────────────────────────────────────────────── */
+    const MEDALS      = ['emoji_events','military_tech','workspace_premium'];
+    const MEDAL_COLS  = ['#DC9E17','#AAABB1','#AD5D08'];
 
-    function Leaderboard({ entries }) {
-      const MEDAL_ICONS  = ['emoji_events', 'military_tech', 'workspace_premium'];
-      const MEDAL_COLORS = ['#DC9E17', '#AAABB1', '#AD5D08'];
-
+    function XPLeaderboard({ entries }) {
       return (
-        <div style={{ ...card({ padding: 0, width: 280, flexShrink: 0, overflow: 'hidden' }) }}>
+        <div style={{ ...card({ padding:0, width:320, flexShrink:0, overflow:'hidden' }) }}>
           <div style={{
-            padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 8,
-            borderBottom: '1px solid var(--color-border-subtle)',
+            padding:'14px 18px', borderBottom:'1px solid var(--color-border-subtle)',
+            display:'flex', alignItems:'center', gap:8,
           }}>
             <Icon name="emoji_events" size={16} color="#DC9E17" />
-            <span style={{ fontWeight: 500, fontSize: 13 }}>Leaderboard</span>
+            <span style={{ fontWeight:600, fontSize:13 }}>XP Leaderboard</span>
+            <span style={{ fontSize:11, color:'var(--color-on-surface-subtle)', marginLeft:'auto' }}>
+              Weekly rankings
+            </span>
           </div>
-          <div style={{ padding: '6px 0' }}>
-            {entries.map((e, i) => (
-              <div key={e.slack_id} style={{
-                display: 'flex', alignItems: 'center',
-                padding: '9px 16px', gap: 10,
-                background: i === 0 ? 'rgba(87,140,255,0.06)' : 'transparent',
-                borderLeft: i === 0 ? '2px solid var(--color-key-primary)' : '2px solid transparent',
-              }}>
-                <span style={{ width: 18, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-                  {i < 3
-                    ? <Icon name={MEDAL_ICONS[i]} size={16} color={MEDAL_COLORS[i]} />
-                    : <span style={{ fontSize: 11, color: 'var(--color-on-surface-subtle)', fontFamily: "'Geist Mono', monospace" }}>{i + 1}</span>
-                  }
-                </span>
-                <span style={{
-                  flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  color: i === 0 ? 'var(--color-key-primary)' : 'var(--color-on-surface)',
-                  fontWeight: i === 0 ? 500 : 400,
+          <div>
+            {entries.map((e, i) => {
+              const xp    = xpFromSaved(e.saved);
+              const level = getLevel(xp);
+              const nextL = LEVELS[LEVELS.indexOf(level)+1];
+              const xpPct = nextL ? ((xp - level.min) / (nextL.min - level.min)) * 100 : 100;
+              const streak= e.streak || 0;
+              const isTop = i === 0;
+
+              return (
+                <div key={e.slack_id} style={{
+                  padding:'14px 18px',
+                  borderBottom: i < entries.length-1 ? '1px solid var(--color-border-subtle)' : 'none',
+                  background: isTop ? 'rgba(87,140,255,0.06)' : 'transparent',
+                  borderLeft: isTop ? '3px solid var(--color-key-primary)' : '3px solid transparent',
                 }}>
-                  {e.name}
-                </span>
-                <span style={{
-                  fontFamily: "'Geist Mono', monospace", fontSize: 13, flexShrink: 0,
-                  color: i === 0 ? 'var(--color-key-primary)' : 'var(--color-on-surface-subtle)',
-                }}>
-                  {fmt(e.saved)}
-                </span>
-              </div>
-            ))}
+                  {/* Row 1: rank + name + emoji + £ */}
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                    <span style={{ width:20, display:'flex', justifyContent:'center', flexShrink:0 }}>
+                      {i < 3
+                        ? <Icon name={MEDALS[i]} size={17} color={MEDAL_COLS[i]} />
+                        : <span style={{ fontSize:11, color:'var(--color-on-surface-subtle)', fontFamily:"'Geist Mono',monospace" }}>{i+1}</span>
+                      }
+                    </span>
+                    <span style={{
+                      flex:1, fontSize:13, fontWeight: isTop ? 700 : 500,
+                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                      color: isTop ? 'var(--color-key-primary)' : 'var(--color-on-surface)',
+                    }}>{e.name}</span>
+                    {streak >= 2 && (
+                      <span title={`${streak}-week streak`} style={{ fontSize:13 }}>
+                        {'🔥'.repeat(Math.min(streak, 3))}
+                      </span>
+                    )}
+                    <span style={{
+                      fontFamily:"'Geist Mono',monospace", fontSize:13, fontWeight:700, flexShrink:0,
+                      color: isTop ? 'var(--color-key-primary)' : 'var(--color-on-surface)',
+                    }}>{fmt(e.saved)}</span>
+                  </div>
+
+                  {/* Row 2: level badge + XP bar + XP count */}
+                  <div style={{ display:'flex', alignItems:'center', gap:8, paddingLeft:30 }}>
+                    <span style={{
+                      display:'inline-flex', alignItems:'center', gap:4,
+                      padding:'2px 8px', borderRadius:99,
+                      background: level.bg,
+                      fontSize:11, fontWeight:700, color:level.color,
+                      flexShrink:0, whiteSpace:'nowrap',
+                    }}>
+                      {level.emoji} {level.name}
+                    </span>
+                    <div style={{ flex:1, height:8, background:'var(--color-border-subtle)', borderRadius:99, overflow:'hidden' }}>
+                      <div style={{
+                        height:'100%', width:`${xpPct}%`, borderRadius:99,
+                        background:`linear-gradient(90deg, ${level.color}99, ${level.color})`,
+                        boxShadow:`0 0 8px ${level.color}55`,
+                        transition:'width 1.2s cubic-bezier(0.4,0,0.2,1)',
+                        animation:'xp-grow 1.2s cubic-bezier(0.4,0,0.2,1)',
+                      }}/>
+                    </div>
+                    <span style={{
+                      fontFamily:"'Geist Mono',monospace", fontSize:11, flexShrink:0,
+                      color:'var(--color-on-surface-subtle)', fontWeight:600,
+                    }}>{xp} XP</span>
+                  </div>
+                  {/* Next level hint */}
+                  {nextL && (
+                    <div style={{ paddingLeft:30, marginTop:4, fontSize:10, color:'var(--color-on-surface-subtle)' }}>
+                      {nextL.min - xp} XP to <span style={{ color:nextL.color, fontWeight:600 }}>{nextL.emoji} {nextL.name}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       );
     }
 
-    // ── Basket status ─────────────────────────────────────────────────────────
-
-    const STATUS_CONFIGS = {
-      draft:     { bg: 'var(--color-border-subtle)',    fg: 'var(--color-on-surface-subtle)', label: 'Draft',     icon: 'edit' },
-      approved:  { bg: 'rgba(5,168,49,0.18)',           fg: 'var(--color-key-success)',       label: 'Approved',  icon: 'check_circle' },
-      delivered: { bg: 'rgba(87,140,255,0.18)',         fg: 'var(--color-key-primary)',       label: 'Delivered', icon: 'local_shipping' },
+    /* ── Basket ─────────────────────────────────────────────────────────── */
+    const STATUS_CFG = {
+      draft:     { bg:'var(--color-border-subtle)',   fg:'var(--color-on-surface-subtle)', label:'Draft',     icon:'edit' },
+      approved:  { bg:'rgba(5,168,49,0.18)',          fg:'var(--color-key-success)',       label:'Approved',  icon:'check_circle' },
+      delivered: { bg:'rgba(87,140,255,0.18)',        fg:'var(--color-key-primary)',       label:'Delivered', icon:'local_shipping' },
     };
-
-    function StatusBadge({ status }) {
-      const cfg = STATUS_CONFIGS[status] || STATUS_CONFIGS.draft;
+    function StatusBadge({ s }) {
+      const c = STATUS_CFG[s] || STATUS_CFG.draft;
       return (
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '0 8px', height: 22, borderRadius: 9999,
-          background: cfg.bg, color: cfg.fg,
-          fontSize: 11, fontWeight: 600,
-        }}>
-          <Icon name={cfg.icon} size={12} color={cfg.fg} />
-          {cfg.label}
+        <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'0 9px', height:24, borderRadius:99, background:c.bg, color:c.fg, fontSize:11, fontWeight:700 }}>
+          <Icon name={c.icon} size={12} color={c.fg} />{c.label}
         </span>
       );
     }
-
     function BasketOrder({ order }) {
       const date = (() => {
-        try {
-          return new Date(order.delivery_date).toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' });
-        } catch (e) { return order.delivery_date; }
+        try { return new Date(order.delivery_date).toLocaleDateString('en-GB', { weekday:'short', month:'short', day:'numeric' }); }
+        catch { return order.delivery_date; }
       })();
-      const accentColor = order.status === 'approved' ? 'var(--color-key-success)'
-                        : order.status === 'delivered' ? 'var(--color-key-primary)'
-                        : 'var(--color-border-subtle)';
-
+      const accent = order.status==='approved' ? 'var(--color-key-success)' : order.status==='delivered' ? 'var(--color-key-primary)' : 'var(--color-border-subtle)';
       return (
-        <div style={{
-          flex: 1,
-          background: 'var(--color-container-surface-low)',
-          borderRadius: 6,
-          padding: 14,
-          border: '1px solid var(--color-border-subtle)',
-          borderTop: `2px solid ${accentColor}`,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ flex:1, background:'var(--color-container-surface-low)', borderRadius:8, padding:16, border:'1px solid var(--color-border-subtle)', borderTop:`2px solid ${accent}` }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:7 }}>
               <Icon name="local_shipping" size={14} color="var(--color-on-surface-subtle)" />
-              <span style={{ fontSize: 13, fontWeight: 500 }}>{date}</span>
+              <span style={{ fontSize:13, fontWeight:600 }}>{date}</span>
             </div>
-            <StatusBadge status={order.status} />
+            <StatusBadge s={order.status} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {order.lines.map((l, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: 'var(--color-on-surface-subtle)' }}>
-                  <span style={{ fontFamily: "'Geist Mono', monospace", color: 'var(--color-on-surface)', fontSize: 12 }}>{l.qty}×</span>{' '}{l.name}
-                </span>
-                <span style={{ fontFamily: "'Geist Mono', monospace", fontSize: 12, color: 'var(--color-on-surface-subtle)', flexShrink: 0, marginLeft: 8 }}>
-                  {fmt(l.qty * l.unit_price)}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div style={{
-            borderTop: '1px solid var(--color-border-subtle)',
-            marginTop: 12, paddingTop: 10,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontSize: 11, color: 'var(--color-on-surface-subtle)' }}>Total</span>
-            <span style={{ fontFamily: "'Geist Mono', monospace", fontSize: 14, fontWeight: 500 }}>{fmt(order.total)}</span>
+          {order.lines.map((l,i) => (
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <span style={{ fontSize:12, color:'var(--color-on-surface-subtle)' }}>
+                <span style={{ fontFamily:"'Geist Mono',monospace", color:'var(--color-on-surface)', fontWeight:600 }}>{l.qty}×</span> {l.name}
+              </span>
+              <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:12, color:'var(--color-on-surface-subtle)', marginLeft:8, flexShrink:0 }}>
+                {fmt(l.qty * l.unit_price)}
+              </span>
+            </div>
+          ))}
+          <div style={{ borderTop:'1px solid var(--color-border-subtle)', marginTop:12, paddingTop:10, display:'flex', justifyContent:'space-between' }}>
+            <span style={{ fontSize:11, color:'var(--color-on-surface-subtle)' }}>Total</span>
+            <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:15, fontWeight:700 }}>{fmt(order.total)}</span>
           </div>
         </div>
       );
     }
-
     function BasketStatus({ basket }) {
       return (
-        <div style={{ ...card({ padding: 0, overflow: 'hidden' }) }}>
-          <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--color-border-subtle)' }}>
+        <div style={{ ...card({ padding:0, overflow:'hidden' }) }}>
+          <div style={{ padding:'14px 18px', display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid var(--color-border-subtle)' }}>
             <Icon name="shopping_basket" size={16} color="var(--color-key-primary)" />
-            <span style={{ fontWeight: 500, fontSize: 13 }}>This Week's Baskets</span>
-            <span style={{ fontSize: 11, color: 'var(--color-on-surface-subtle)', marginLeft: 4 }}>w/c {basket.week}</span>
+            <span style={{ fontWeight:600, fontSize:13 }}>This Week's Baskets</span>
+            <span style={{ fontSize:11, color:'var(--color-on-surface-subtle)', marginLeft:4 }}>w/c {basket.week}</span>
           </div>
-          <div style={{ display: 'flex', gap: 12, padding: 16 }}>
+          <div style={{ display:'flex', gap:14, padding:18 }}>
             {basket.orders.map(o => <BasketOrder key={o.id} order={o} />)}
           </div>
         </div>
       );
     }
 
-    // ── Weekly chart (inline SVG) ─────────────────────────────────────────────
-
+    /* ── Weekly chart ───────────────────────────────────────────────────── */
     function WeeklyChart({ totals }) {
       try {
-        const W = 560, H = 96, PAD_L = 48, PAD_R = 12, PAD_B = 22;
-        const chartW = W - PAD_L - PAD_R;
-        const maxVal = Math.max(...totals.flatMap(t => [t.claimed + t.wasted])) * 1.15 || 60;
-        const n      = totals.length;
-        const colW   = chartW / n;
-        const barW   = colW * 0.28;
-
-        const yTicks = [0, maxVal / 2, maxVal].map(v => ({
-          v, y: H - (v / maxVal) * H,
-        }));
-
+        const W=580,H=100,PL=52,PR=12,PB=24;
+        const cW = W-PL-PR;
+        const max = Math.max(...totals.flatMap(t=>[t.claimed+t.wasted]))*1.15||60;
+        const n   = totals.length, colW=cW/n, bW=colW*0.3;
+        const yticks = [0, max/2, max].map(v=>({ v, y:H-(v/max)*H }));
         return (
-          <div style={{ ...card() }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ ...card({ padding:'18px 22px' }) }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <Icon name="bar_chart" size={16} color="var(--color-on-surface-subtle)" />
-                <span style={{ fontWeight: 500, fontSize: 13 }}>Weekly Impact</span>
+                <span style={{ fontWeight:600, fontSize:13 }}>Weekly Impact</span>
               </div>
-              <div style={{ display: 'flex', gap: 16 }}>
-                {[['Rescued', '#70D913'], ['Wasted', '#FF5359']].map(([label, color]) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-                    <span style={{ fontSize: 11, color: 'var(--color-on-surface-subtle)' }}>{label}</span>
+              <div style={{ display:'flex', gap:20 }}>
+                {[['Rescued','#70D913'],['Wasted','#FF5359']].map(([l,c])=>(
+                  <div key={l} style={{ display:'flex', alignItems:'center', gap:7 }}>
+                    <div style={{ width:10, height:10, borderRadius:3, background:c }}/>
+                    <span style={{ fontSize:12, color:'var(--color-on-surface-subtle)' }}>{l}</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            <svg viewBox={`0 0 ${W} ${H + PAD_B}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-              {/* Grid lines */}
-              {yTicks.map(t => (
+            <svg viewBox={`0 0 ${W} ${H+PB}`} style={{ width:'100%', display:'block', overflow:'visible' }}>
+              {yticks.map(t=>(
                 <g key={t.y}>
-                  <line x1={PAD_L} y1={t.y} x2={W - PAD_R} y2={t.y}
-                    stroke="var(--color-border-subtle)" strokeWidth={1} />
-                  <text x={PAD_L - 6} y={t.y + 4} textAnchor="end" fontSize={9}
-                    fill="var(--color-on-surface-subtle)" fontFamily="Geist Mono, monospace">
-                    {fmt(t.v)}
-                  </text>
+                  <line x1={PL} y1={t.y} x2={W-PR} y2={t.y} stroke="var(--color-border-subtle)" strokeWidth={1}/>
+                  <text x={PL-7} y={t.y+4} textAnchor="end" fontSize={9} fill="var(--color-on-surface-subtle)" fontFamily="Geist Mono,monospace">{fmt(t.v)}</text>
                 </g>
               ))}
-
-              {/* Bars */}
-              {totals.map((t, i) => {
-                const cx       = PAD_L + i * colW + colW / 2;
-                const claimedH = (t.claimed / maxVal) * H;
-                const wastedH  = (t.wasted  / maxVal) * H;
+              {totals.map((t,i)=>{
+                const cx=PL+i*colW+colW/2;
+                const cH=(t.claimed/max)*H, wH=(t.wasted/max)*H;
                 return (
                   <g key={i}>
-                    <rect x={cx - barW - 2} y={H - claimedH} width={barW} height={claimedH}
-                      fill="#70D913" rx={2} opacity={0.85} />
-                    <rect x={cx + 2}        y={H - wastedH}  width={barW} height={wastedH}
-                      fill="#FF5359" rx={2} opacity={0.85} />
-                    <text x={cx} y={H + PAD_B - 2} textAnchor="middle" fontSize={10}
-                      fill="var(--color-on-surface-subtle)" fontFamily="Geist, sans-serif">
-                      {t.week}
-                    </text>
+                    <rect x={cx-bW-2} y={H-cH} width={bW} height={cH} fill="#70D913" rx={3} opacity={0.9}/>
+                    <rect x={cx+2}    y={H-wH}  width={bW} height={wH} fill="#FF5359" rx={3} opacity={0.9}/>
+                    <text x={cx} y={H+PB-3} textAnchor="middle" fontSize={10} fill="var(--color-on-surface-subtle)" fontFamily="Geist,sans-serif">{t.week}</text>
                   </g>
                 );
               })}
             </svg>
           </div>
         );
-      } catch (e) {
-        console.error('[WeeklyChart] render error:', e.message, e.stack);
-        return null;
-      }
+      } catch(e) { console.error('[WeeklyChart]',e.message); return null; }
     }
 
-    // ── App root ──────────────────────────────────────────────────────────────
+    /* ── App ────────────────────────────────────────────────────────────── */
+    const SIM_ITEMS  = ['Hummus & Flatbreads','Falafel Bowl','Fruit Pot','Mixed Leaf Salad','Chicken Caesar Wrap'];
+    const SIM_PRICES = [2.50, 4.50, 2.00, 1.80, 3.50];
+    let simIdx = 0;
 
     function App() {
-      const [theme, setTheme] = useState('dark');
-      const [data,  setData]  = useState(MOCK);
+      const [theme,  setTheme]  = useState('dark');
+      const [data,   setData]   = useState(MOCK);
       const [floats, setFloats] = useState([]);
-      const [live,  setLive]  = useState(false);
+      const [live,   setLive]   = useState(false);
+      const [toasts, setToasts] = useState([]);
+      const [feed,   setFeed]   = useState([]);
+      const uid = useRef(0);
 
       useEffect(() => {
         document.documentElement.classList.toggle('light', theme === 'light');
       }, [theme]);
 
-      // 5-second data poll
+      const handleClaim = useCallback((value, itemName, user) => {
+        try {
+          setData(d => {
+            const was = d.stats.saved_week;
+            const nxt = was + value;
+            const hit = [50,100,150,200,300].find(m => was < m && nxt >= m);
+            if (hit) {
+              setToasts(ts => [...ts, {
+                id: uid.current++,
+                emoji:'🎉',
+                title:`${fmt(hit)} Milestone!`,
+                body:`The team has saved ${fmt(nxt)} worth of food this week.`,
+              }]);
+            }
+            return {
+              ...d,
+              stats: {
+                ...d.stats,
+                saved_week:    nxt,
+                items_rescued: d.stats.items_rescued + 1,
+              },
+            };
+          });
+          setFloats(f => [...f, { id: uid.current++, value }]);
+          setFeed(f => [{
+            id: uid.current++, kind:'claimed',
+            user: user || 'Someone',
+            item: itemName || 'an item',
+            value,
+          }, ...f.slice(0, 19)]);
+        } catch(e) { console.error('[handleClaim]',e.message); }
+      }, []);
+
+      /* Poll */
       useEffect(() => {
-        const fetchAll = async () => {
+        const go = async () => {
           try {
-            const [s, lb, r, b, t] = await Promise.all([
-              fetch('/api/stats'),
-              fetch('/api/leaderboard'),
-              fetch('/api/rescue'),
-              fetch('/api/basket'),
-              fetch('/api/totals'),
+            const [s,lb,r,b,t] = await Promise.all([
+              fetch('/api/stats'), fetch('/api/leaderboard'),
+              fetch('/api/rescue'), fetch('/api/basket'), fetch('/api/totals'),
             ]);
             if (!s.ok) return;
-            const [stats, leaderboard, rescue, basket, totals] = await Promise.all([
-              s.json(), lb.json(), r.json(), b.json(), t.json(),
+            const [stats,leaderboard,rescue,basket,totals] = await Promise.all([
+              s.json(),lb.json(),r.json(),b.json(),t.json()
             ]);
-            setData({ stats, leaderboard, rescue, basket, totals });
-          } catch (_) {
-            // No API server — stay on mock data
-          }
+            setData(d => ({ ...d, stats, leaderboard, rescue, basket, totals }));
+          } catch(_) {}
         };
-        fetchAll();
-        const id = setInterval(fetchAll, 5000);
+        go();
+        const id = setInterval(go, 5000);
         return () => clearInterval(id);
       }, []);
 
-      // SSE live counter
+      /* SSE */
       useEffect(() => {
         let es;
         try {
           es = new EventSource('/api/events/stream');
           es.onopen  = () => setLive(true);
           es.onerror = () => setLive(false);
-          es.onmessage = (e) => {
+          es.onmessage = e => {
             try {
               const ev = JSON.parse(e.data);
-              if (ev.kind === 'claimed' && ev.value > 0) {
-                setData(d => ({
-                  ...d,
-                  stats: {
-                    ...d.stats,
-                    saved_week:    d.stats.saved_week    + ev.value,
-                    items_rescued: d.stats.items_rescued + 1,
-                    active_claimers: d.stats.active_claimers,
-                  },
-                }));
-                setFloats(f => [...f, { id: Date.now() + Math.random(), value: ev.value }]);
-              }
-            } catch (err) {
-              console.error('[SSE onmessage]', err.message);
-            }
+              if (ev.kind==='claimed' && ev.value>0)
+                handleClaim(ev.value, ev.item||'an item', ev.user||'Someone');
+            } catch(err) { console.error('[SSE]',err.message); }
           };
-        } catch (_) {}
-        return () => { try { es && es.close(); } catch (_) {} };
-      }, []);
+        } catch(_) {}
+        return () => { try { es && es.close(); } catch(_) {} };
+      }, [handleClaim]);
 
-      const expireFloat = useCallback((id) => setFloats(f => f.filter(x => x.id !== id)), []);
+      const onSim = useCallback(() => {
+        try {
+          const i = simIdx % SIM_ITEMS.length;
+          simIdx++;
+          boom(null, null);
+          handleClaim(SIM_PRICES[i], SIM_ITEMS[i], MOCK_NAMES[simIdx % MOCK_NAMES.length]);
+        } catch(e) { console.error('[onSim]',e.message); }
+      }, [handleClaim]);
+
+      const expFloat = useCallback(id => setFloats(f => f.filter(x=>x.id!==id)), []);
+      const expToast = useCallback(id => setToasts(t => t.filter(x=>x.id!==id)), []);
+      const onRescue = useCallback(item => handleClaim(item.price, item.name, 'You'), [handleClaim]);
 
       return (
         <div>
-          <Header theme={theme} onToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} live={live} />
-          <main style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <HeroCounter total={data.stats.saved_week} floats={floats} onExpireFloat={expireFloat} />
-            <StatTiles stats={data.stats} />
-            <FridgeHealthBar rescue={data.rescue} />
-            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              <RescueBoard items={data.rescue} />
-              <Leaderboard entries={data.leaderboard} />
+          <Header theme={theme} onToggle={()=>setTheme(t=>t==='dark'?'light':'dark')} live={live} onSim={onSim}/>
+
+          {/* Toast stack */}
+          <div style={{ position:'fixed', right:20, top:68, display:'flex', flexDirection:'column', gap:10, zIndex:500, pointerEvents:'none' }}>
+            {toasts.map(t => (
+              <div key={t.id} style={{ pointerEvents:'auto' }}>
+                <Toast t={t} onClose={()=>expToast(t.id)}/>
+              </div>
+            ))}
+          </div>
+
+          <main style={{ maxWidth:1260, margin:'0 auto', padding:'22px 28px 56px', display:'flex', flexDirection:'column', gap:16 }}>
+
+            {/* Hero */}
+            <Hero total={data.stats.saved_week} floats={floats} onExpireFloat={expFloat}/>
+
+            {/* Stat row */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+              <StatTile icon="savings"       value={fmt(data.stats.saved_week)} label="Saved this week"  accent="var(--color-key-success)" sub="vs £89 same time last week" />
+              <StatTile icon="recycling"     value={data.stats.items_rescued}   label="Items rescued"    accent="#70D913" />
+              <StatTile icon="shopping_cart" value={data.stats.pending_orders}  label="Awaiting approval" accent="var(--color-key-warning)" />
+              <StatTile icon="group"         value={data.stats.active_claimers} label="Active heroes"    accent="var(--color-key-primary)" />
             </div>
-            <BasketStatus basket={data.basket} />
-            <WeeklyChart totals={data.totals} />
+
+            {/* Fridge HP */}
+            <FridgeHP rescue={data.rescue}/>
+
+            {/* Feed + Battle + Challenge */}
+            <div style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
+              <ActivityFeed events={feed}/>
+              <div style={{ display:'flex', flexDirection:'column', gap:16, flex:1 }}>
+                <DeptBattle departments={data.departments || MOCK.departments}/>
+                <WeeklyChallenge saved={data.stats.saved_week} challenge={data.challenge || MOCK.challenge}/>
+              </div>
+            </div>
+
+            {/* Rescue + XP leaderboard */}
+            <div style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
+              <RescueBoard items={data.rescue} onClaim={onRescue}/>
+              <XPLeaderboard entries={data.leaderboard}/>
+            </div>
+
+            {/* Baskets + chart */}
+            <BasketStatus basket={data.basket}/>
+            <WeeklyChart totals={data.totals}/>
+
           </main>
         </div>
       );
