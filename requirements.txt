@@ -1,0 +1,3 @@
+anthropic
+slack-bolt
+psycopg2-binary
