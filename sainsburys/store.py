@@ -180,6 +180,12 @@ def build_baskets(week):
             qty_by_product = _selection_lines(week, half)
             if not qty_by_product:
                 continue
+            # Mark swept selections 'ordered' so re-running never double-counts them
+            conn.execute(
+                "update selections set status = 'ordered' "
+                "where week = ? and half = ? and status in ('pending', 'confirmed')",
+                (str(week), half),
+            )
             cur = conn.execute(
                 "insert into orders (week, delivery_date, status) values (?, ?, 'draft') returning id",
                 (str(week), str(delivery)),
