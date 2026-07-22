@@ -1,0 +1,4 @@
+{
+  "user_slack_ids": ["U001", "U002", "U003"],
+  "last_two_weeks": [1, 3, 7, 12, 15]
+}

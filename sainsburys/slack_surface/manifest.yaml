@@ -1,0 +1,32 @@
+display_information:
+  name: sAInsburys
+features:
+  bot_user:
+    display_name: sAInsburys
+  slash_commands:
+    - command: /demo-suggest
+      description: Post this week's meal picker
+    - command: /demo-aggregate
+      description: Build the baskets from selections
+    - command: /demo-deliver
+      description: Simulate delivery and create inventory lots
+    - command: /demo-checkin
+      description: Send Friday what-did-you-eat DMs
+    - command: /demo-rescue
+      description: Post the rescue board
+    - command: /demo-sweep
+      description: Log waste and post weekly digest
+    - command: /demo-reset
+      description: Reset to seeded demo state
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - commands
+      - im:write
+      - users:read
+      - channels:read
+settings:
+  interactivity:
+    is_enabled: true
+  socket_mode_enabled: true
