@@ -68,36 +68,37 @@ def handle_order_submit(body, client):
         )
 
 
-# ── /demo-deliver (Track A) ────────────────────────────────────────────────────
+# ── Delivery (Track A) ─────────────────────────────────────────────────────────
+# Team decision: no physical delivery tracking — everything ordered is assumed
+# delivered. Check-in auto-delivers, so /order → /demo-checkin needs no step
+# in between. /demo-deliver stays as an optional manual trigger.
+
+def ensure_delivered(week):
+    """
+    Idempotent: sweep any new selections into baskets and straight to fridge
+    lots (selections are marked 'ordered', so re-running delivers nothing twice).
+    Returns the newly created lots.
+    """
+    lots = []
+    for order in store.build_baskets(week):
+        store.approve_order(order["id"])
+        lots.extend(store.deliver_order(order["id"]))
+    return lots
+
 
 def simulate_delivery(client, channel, order_ids=None):
-    """
-    Create fridge lots. Delivers explicit ids, else the week's approved orders.
-    Demo shortcut until /demo-aggregate lands: with nothing approved, build
-    baskets from this week's selections and deliver them directly (says so).
-    """
-    week = _current_week()
-    shortcut = False
+    """Optional manual delivery trigger — check-in already does this itself."""
     if order_ids:
-        ids = order_ids
+        lots = []
+        for oid in order_ids:
+            lots.extend(store.deliver_order(oid))
     else:
-        ids = [o["id"] for o in store.approved_orders(week)]
-        if not ids:
-            drafts = store.build_baskets(week)
-            if not drafts:
-                client.chat_postMessage(channel=channel,
-                                        text="Nothing to deliver — no selections this week yet.")
-                return
-            ids = [store.approve_order(o["id"])["id"] for o in drafts]
-            shortcut = True
-
-    lots = []
-    for oid in ids:
-        lots.extend(store.deliver_order(oid))
-
-    note = ("\n_(demo shortcut: no approved baskets, so this week's selections were "
-            "built and delivered directly — the Approve step arrives with /demo-aggregate)_"
-            if shortcut else "")
-    client.chat_postMessage(
-        channel=channel,
-        text="📦 Delivery logged — %d lots now in the fridge.%s" % (len(lots), note))
+        lots = ensure_delivered(_current_week())
+    if lots:
+        client.chat_postMessage(
+            channel=channel,
+            text="📦 %d lots in the fridge from this week's orders." % len(lots))
+    else:
+        client.chat_postMessage(
+            channel=channel,
+            text="Fridge is up to date — no new orders since the last delivery.")
