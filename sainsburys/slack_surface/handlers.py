@@ -17,6 +17,44 @@ def register(app):
         ack()
         basket.handle_order_submit(body, client)
 
+    # ── /suggest (open suggestions with accept/refine loop) ─────────────────────
+
+    @app.command("/suggest")
+    def suggest(ack, client, body):
+        ack()
+        client.views_open(trigger_id=body["trigger_id"], view=_suggest_modal())
+
+    @app.view("suggest_submit")
+    def on_suggest_submit(ack, body, client):
+        ack()
+        basket.handle_suggest_submit(body, client)
+
+    @app.action("suggestion_accept")
+    def on_suggestion_accept(ack, respond, body):
+        ack()
+
+        def _go():
+            store.accept_selection(int(body["actions"][0]["value"]))
+            _replace_actions(respond, body, "✅ Ordered — it'll be in this week's basket!")
+
+        _run(respond, _go)
+
+    @app.action("suggestion_refine")
+    def on_suggestion_refine(ack, respond, body, client):
+        ack()
+
+        def _go():
+            selection_id = body["actions"][0]["value"]
+            client.views_open(trigger_id=body["trigger_id"],
+                              view=_refine_modal(selection_id))
+
+        _run(respond, _go)
+
+    @app.view("refine_submit")
+    def on_refine_submit(ack, body, client):
+        ack()
+        basket.handle_refine_submit(body, client)
+
     # ── /demo-aggregate (build baskets + post Approve buttons) ──────────────────
 
     @app.command("/demo-aggregate")
@@ -254,6 +292,66 @@ def _record_checkin(respond, body, client, fraction):
                  "Whatever's left goes on the rescue board 🛟" % (
                 summary["eaten_value"], summary["ordered_value"]),
         )
+
+
+def _suggest_modal():
+    return {
+        "type": "modal",
+        "callback_id": "suggest_submit",
+        "title": {"type": "plain_text", "text": "Suggest my lunch"},
+        "submit": {"type": "plain_text", "text": "Suggest"},
+        "blocks": [
+            {
+                "type": "input",
+                "block_id": "suggest_mood",
+                "optional": True,
+                "label": {"type": "plain_text", "text": "What are you in the mood for?"},
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "mood",
+                    "placeholder": {"type": "plain_text",
+                                    "text": "e.g. something light, spicy, asian… or leave blank for a surprise"},
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "suggest_half",
+                "label": {"type": "plain_text", "text": "Delivery"},
+                "element": {
+                    "type": "static_select",
+                    "action_id": "half",
+                    "options": [
+                        {"text": {"type": "plain_text", "text": "Early week (Mon)"}, "value": "early"},
+                        {"text": {"type": "plain_text", "text": "Late week (Wed)"}, "value": "late"},
+                    ],
+                },
+            },
+        ],
+    }
+
+
+def _refine_modal(selection_id):
+    return {
+        "type": "modal",
+        "callback_id": "refine_submit",
+        "private_metadata": str(selection_id),
+        "title": {"type": "plain_text", "text": "Change something"},
+        "submit": {"type": "plain_text", "text": "Re-suggest"},
+        "blocks": [
+            {
+                "type": "input",
+                "block_id": "refine_text",
+                "label": {"type": "plain_text", "text": "What should be different?"},
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "feedback",
+                    "multiline": True,
+                    "placeholder": {"type": "plain_text",
+                                    "text": "e.g. no fish, add a drink, something more filling"},
+                },
+            },
+        ],
+    }
 
 
 def _order_modal():

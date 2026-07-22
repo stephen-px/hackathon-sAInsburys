@@ -64,15 +64,25 @@ def ensure_user(slack_id, name):
 
 # ── Selections ────────────────────────────────────────────────────────────────
 
-def record_selection(user, week, half, meal_id=None, parsed=None, freeform=None):
-    """Insert a selection row. Returns the Selection record."""
+def record_selection(user, week, half, meal_id=None, parsed=None, freeform=None, status="pending"):
+    """Insert a selection row. Returns the Selection record.
+
+    status='proposed' rows are agent suggestions awaiting Accept — they are
+    invisible to check-in, baskets, and leftovers until accepted."""
     return _q(
         "insert into selections (week, half, user_slack_id, meal_id, freeform, parsed, status) "
-        "values (?, ?, ?, ?, ?, ?, 'pending') "
+        "values (?, ?, ?, ?, ?, ?, ?) "
         "returning id, week, half, user_slack_id, meal_id, freeform, parsed, status",
-        (str(week), half, user, meal_id, freeform, json.dumps(parsed) if parsed else None),
+        (str(week), half, user, meal_id, freeform,
+         json.dumps(parsed) if parsed else None, status),
         fetch="one",
     )
+
+
+def accept_selection(selection_id):
+    """Promote a proposed suggestion into a real (pending) selection."""
+    _q("update selections set status = 'pending' where id = ? and status = 'proposed'",
+       (selection_id,))
 
 
 def confirm_selection(selection_id):
@@ -94,11 +104,11 @@ def get_selection(selection_id):
     )
 
 
-def update_selection_parsed(selection_id, parsed):
+def update_selection_parsed(selection_id, parsed, status="pending"):
     """Attach a (re)parsed plan to an existing selection."""
     _q(
-        "update selections set parsed = ?, status = 'pending' where id = ?",
-        (json.dumps(parsed), selection_id),
+        "update selections set parsed = ?, status = ? where id = ?",
+        (json.dumps(parsed), status, selection_id),
     )
 
 
@@ -307,7 +317,7 @@ def open_items_for(user, week):
     """
     selections = _q(
         "select meal_id, parsed from selections "
-        "where user_slack_id = ? and week = ? and status != 'void'",
+        "where user_slack_id = ? and week = ? and status not in ('void', 'proposed')",
         (user, str(week)),
         fetch="all",
     ) or []
@@ -398,7 +408,7 @@ def leftovers(week=None):
     for half, delivered in (("early", monday), ("late", monday + timedelta(days=2))):
         selections = _q(
             "select user_slack_id, meal_id, parsed from selections "
-            "where week = ? and half = ? and status != 'void'",
+            "where week = ? and half = ? and status not in ('void', 'proposed')",
             (str(monday), half),
             fetch="all",
         ) or []

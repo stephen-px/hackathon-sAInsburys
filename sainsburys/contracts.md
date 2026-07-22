@@ -7,8 +7,13 @@
 ensure_user(slack_id, name) -> None
 
 # Selections
-record_selection(user, week, half, meal_id=None, parsed=None, freeform=None) -> Selection
+# status lifecycle: proposed (suggestion awaiting Accept) → pending → confirmed / ordered; void = superseded
+record_selection(user, week, half, meal_id=None, parsed=None, freeform=None, status='pending') -> Selection
 confirm_selection(selection_id) -> None
+accept_selection(selection_id) -> None    # proposed → pending
+void_selection(selection_id) -> None
+get_selection(selection_id) -> Selection
+update_selection_parsed(selection_id, parsed, status='pending') -> None
 
 # Catalogue helpers (used by agent tools)
 search_products_db(query) -> list[Product]
@@ -41,6 +46,7 @@ weekly_totals() -> list
 | command       | handler                | description              |
 |---------------|------------------------|--------------------------|
 | /order        | handlers.order         | Open the order modal     |
+| /suggest      | handlers.suggest       | Suggest a lunch (accept/refine loop) |
 | /demo-checkin | handlers.demo_checkin  | Send Friday check-in DMs |
 | /demo-rescue  | handlers.demo_rescue   | Post the rescue board    |
 
