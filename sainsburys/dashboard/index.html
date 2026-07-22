@@ -1025,9 +1025,20 @@
     const SIM_PRICES = [2.50, 4.50, 2.00, 1.80, 3.50];
     let simIdx = 0;
 
+    const EMPTY = {
+      stats:       { saved_week: 0, items_rescued: 0, pending_orders: 0, active_claimers: 0 },
+      leaderboard: [],
+      rescue:      [],
+      basket:      { week: '', orders: [] },
+      totals:      [],
+      departments: MOCK.departments,
+      challenge:   MOCK.challenge,
+    };
+
     function App() {
       const [theme,  setTheme]  = useState('dark');
-      const [data,   setData]   = useState(MOCK);
+      const [data,   setData]   = useState(EMPTY);
+      const [apiOk,  setApiOk]  = useState(false);   // true once server responds
       const [floats, setFloats] = useState([]);
       const [live,   setLive]   = useState(false);
       const [toasts, setToasts] = useState([]);
@@ -1071,7 +1082,7 @@
         } catch(e) { console.error('[handleClaim]',e.message); }
       }, []);
 
-      /* Poll */
+      /* Poll — real data from API, MOCK only if server is completely unreachable */
       useEffect(() => {
         const go = async () => {
           try {
@@ -1083,8 +1094,12 @@
             const [stats,leaderboard,rescue,basket,totals] = await Promise.all([
               s.json(),lb.json(),r.json(),b.json(),t.json()
             ]);
+            setApiOk(true);
             setData(d => ({ ...d, stats, leaderboard, rescue, basket, totals }));
-          } catch(_) {}
+          } catch(_) {
+            // API server unreachable — fall back to demo data so the UI isn't blank
+            if (!apiOk) setData(MOCK);
+          }
         };
         go();
         const id = setInterval(go, 5000);

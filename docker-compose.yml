@@ -1,11 +1,20 @@
 services:
 
-  # ── One-shot DB initialiser ─────────────────────────────────────────────────
-  # Creates the SQLite schema and seeds the product catalogue.
-  # Re-running is safe (idempotent).  Delete sainsburys/data/lunch.db to wipe.
+  # ── One-shot demo seeder ────────────────────────────────────────────────────
+  # Wipes and recreates the DB with a realistic demo week of data.
+  # Use `init` for a clean schema-only init; use `demo` to get real dashboard data.
   init:
     build: .
     command: python sainsburys/data/init_db.py
+    volumes:
+      - .:/app
+    env_file:
+      - sainsburys/.env
+
+  # ── Demo data seeder (run once to populate real data for the dashboard) ──────
+  demo:
+    build: .
+    command: python sainsburys/data/demo_reset.py
     volumes:
       - .:/app
     env_file:

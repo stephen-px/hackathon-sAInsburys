@@ -153,7 +153,7 @@ def leaderboard():
         """)
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
-        return jsonify(rows or MOCK_LEADERBOARD)
+        return jsonify(rows)
     except Exception:
         return jsonify(MOCK_LEADERBOARD)
 
@@ -182,7 +182,7 @@ def rescue():
         """)
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
-        return jsonify(rows or MOCK_RESCUE)
+        return jsonify(rows)
     except Exception:
         return jsonify(MOCK_RESCUE)
 
@@ -218,8 +218,9 @@ def basket():
                 "lines": lines,
             })
         conn.close()
-        week = str(orders[0]["delivery_date"])[:10] if orders else MOCK_BASKET["week"]
-        return jsonify({"week": week, "orders": orders or MOCK_BASKET["orders"]})
+        from datetime import date
+        week = str(orders[0]["delivery_date"])[:10] if orders else str(date.today())
+        return jsonify({"week": week, "orders": orders})
     except Exception:
         return jsonify(MOCK_BASKET)
 
@@ -243,7 +244,7 @@ def totals():
         """)
         rows = list(reversed([dict(r) for r in cur.fetchall()]))
         conn.close()
-        return jsonify(rows or MOCK_TOTALS)
+        return jsonify(rows)
     except Exception:
         return jsonify(MOCK_TOTALS)
 
