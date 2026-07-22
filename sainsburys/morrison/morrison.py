@@ -57,7 +57,10 @@ def fridge_mood():
             return "hidden"
     try:
         items = store.leftovers()
-    except Exception:
+    except Exception as e:
+        # Say WHY we're hiding — a stale-schema lunch.db lands here.
+        print("morrison: fridge check failed (%s: %s) — is lunch.db seeded "
+              "with the current schema? Try: python data/seed.py" % (type(e).__name__, e))
         items = []
     if any(i["days_left"] <= 0 for i in items):
         return "sad"

@@ -439,7 +439,7 @@ def leftovers(week=None):
     ) or []
     claimed = _q(
         "select product_id, sum(qty) as q from events "
-        "where kind = 'claimed' and date(ts) >= ? group by product_id",
+        "where kind in ('claimed', 'wasted') and date(ts) >= ? group by product_id",
         (str(monday),),
         fetch="all",
     ) or []
