@@ -1,40 +1,45 @@
-# contracts.md — the shared interface between tracks A, B, and C
+# contracts.md — the shared interface between tracks
 
 ## store.py signatures
 
 ```python
+# Users
+ensure_user(slack_id, name) -> None
+
+# Selections
 record_selection(user, week, half, meal_id=None, parsed=None, freeform=None) -> Selection
 confirm_selection(selection_id) -> None
+
+# Catalogue helpers (used by agent tools)
+search_products_db(query) -> list[Product]
+get_meals_db() -> list[Meal]
+get_user_prefs_db(user_slack_id) -> dict
+get_products_by_ids(ids) -> list[Product]
+
+# TODO — not yet implemented
 build_baskets(week) -> list[Order]
 approve_order(order_id) -> Order
 deliver_order(order_id) -> list[Lot]
 open_items_for(user, week) -> list[LotShare]
 record_consumption(user, lot_id, fraction) -> Event
 leftovers() -> list[Lot]
-claim_lot(lot_id, user) -> Event          # .name, .value
+claim_lot(lot_id, user) -> Event
 sweep_waste(week) -> Digest
 leaderboard() -> list
 weekly_totals() -> list
 ```
 
-## Button action_ids
+## Slash commands
 
-| action_id        | value         | handler                  |
-|------------------|---------------|--------------------------|
-| meal_pick_early  | meal_id (str) | handlers.on_meal_pick_early |
-| meal_pick_late   | meal_id (str) | handlers.on_meal_pick_late  |
-| freeform_open    | —             | handlers.on_freeform_open   |
-| approve_order    | order_id      | handlers.on_approve_order   |
-| claim            | lot_id        | handlers.on_claim           |
-| checkin_ate      | lot_id        | handlers.on_checkin_ate     |
-| checkin_some     | lot_id        | handlers.on_checkin_some    |
-| checkin_none     | lot_id        | handlers.on_checkin_none    |
+| command  | handler                  | description          |
+|----------|--------------------------|----------------------|
+| /order   | handlers.order           | Open the order modal |
 
 ## Modal callback_ids
 
-| callback_id      | handler                    |
-|------------------|----------------------------|
-| freeform_submit  | handlers.on_freeform_submit |
+| callback_id  | handler                  |
+|--------------|--------------------------|
+| order_submit | handlers.on_order_submit |
 
 ## Rules
 - Changing a store.py signature = tell the group first.

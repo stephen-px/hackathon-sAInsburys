@@ -60,77 +60,23 @@ SUBMIT_MEAL_PLAN = {
     },
 }
 
-SUBMIT_SUGGESTIONS = {
-    "name": "submit_suggestions",
-    "description": "Finisher: submit a list of meal suggestions for the picker.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "meals": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "meal_id": {"type": "integer"},
-                        "rationale": {"type": "string"},
-                    },
-                    "required": ["meal_id"],
-                },
-            },
-        },
-        "required": ["meals"],
-    },
-}
-
-SUBMIT_MATCHES = {
-    "name": "submit_matches",
-    "description": "Finisher: submit personalised rescue matches per user.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "matches": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "user_slack_id": {"type": "string"},
-                        "lot_id": {"type": "integer"},
-                        "reason": {"type": "string"},
-                    },
-                    "required": ["user_slack_id", "lot_id", "reason"],
-                },
-            },
-        },
-        "required": ["matches"],
-    },
-}
-
 
 # ── Tool implementations ───────────────────────────────────────────────────────
 
 def search_products(query: str) -> list:
-    raise NotImplementedError
+    return store.search_products_db(query)
 
 
 def get_meals() -> list:
-    raise NotImplementedError
+    return store.get_meals_db()
 
 
 def get_user_prefs(user_slack_id: str) -> dict:
-    raise NotImplementedError
+    return store.get_user_prefs_db(user_slack_id)
 
 
 def submit_meal_plan(product_lines: list, half: str, notes: str = "") -> dict:
-    # Finisher — the caller reads this back from block.input directly.
     return {"product_lines": product_lines, "half": half, "notes": notes}
-
-
-def submit_suggestions(meals: list) -> dict:
-    return {"meals": meals}
-
-
-def submit_matches(matches: list) -> dict:
-    return {"matches": matches}
 
 
 IMPLS = {
@@ -138,6 +84,4 @@ IMPLS = {
     "get_meals": get_meals,
     "get_user_prefs": get_user_prefs,
     "submit_meal_plan": submit_meal_plan,
-    "submit_suggestions": submit_suggestions,
-    "submit_matches": submit_matches,
 }
