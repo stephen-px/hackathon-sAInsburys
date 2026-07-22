@@ -21,7 +21,9 @@ users_with_selections(week) -> list[slack_id]
 open_items_for(user, week) -> list[{lot_id, name, qty}]        # FIFO by expiry
 record_consumption(user, lot_id, fraction) -> {lot_id, name, qty, value}
 
-# Orders / delivery (implemented — /demo-deliver)
+# Orders / delivery (implemented — auto-delivery: ordered ⇒ assumed delivered)
+# Selections move status pending/confirmed → 'ordered' when swept into baskets,
+# so build_baskets is idempotent. /demo-checkin auto-delivers before DMing.
 build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price}]
 approve_order(order_id) -> Order
 approved_orders(week) -> list[Order]      # approved + undelivered
