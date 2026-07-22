@@ -6,6 +6,8 @@ features:
   slash_commands:
     - command: /order
       description: Order your lunch for the week
+    - command: /suggest
+      description: Get a lunch suggestion — accept it or ask for changes
     - command: /demo-aggregate
       description: Build baskets from this week's orders and post for approval
     - command: /demo-checkin

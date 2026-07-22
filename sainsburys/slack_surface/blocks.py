@@ -51,6 +51,28 @@ def order_confirmation_blocks(selection_id, half, lines_text, notes, order_text)
     ]
 
 
+def suggestion_blocks(selection_id, lines_text, notes, mood):
+    """A proposed lunch plan with Accept / Refine buttons."""
+    sid = str(selection_id)
+    header = ":bulb: *How about this?*"
+    if notes:
+        header += "\n_%s_" % notes
+    context = "You asked for: “%s”" % mood if (mood or "").strip() else "Surprise pick — no brief given"
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": header}},
+        {"type": "section", "text": {"type": "mrkdwn", "text": lines_text}},
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": context}]},
+        {"type": "actions", "elements": [
+            {"type": "button", "style": "primary",
+             "text": {"type": "plain_text", "text": "Order it ✅"},
+             "action_id": "suggestion_accept", "value": sid},
+            {"type": "button",
+             "text": {"type": "plain_text", "text": "Change something 🔄"},
+             "action_id": "suggestion_refine", "value": sid},
+        ]},
+    ]
+
+
 def order_failure_blocks(selection_id, order_text, err):
     """Parse failed: raw request saved, offer a one-tap retry."""
     return [

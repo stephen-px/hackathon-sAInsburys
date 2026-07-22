@@ -1,24 +1,35 @@
 """
-Basket Agent — Step 1: suggest 5 meals for the week picker.
+Basket Agent — open suggestions: propose a lunch plan, refine on feedback.
 """
+import json
 from pathlib import Path
 from agents.loop import run_agent
-from agents.tools import GET_MEALS, GET_USER_PREFS, SUBMIT_SUGGESTIONS, IMPLS
+from agents.tools import SEARCH_PRODUCTS, GET_MEALS, GET_USER_PREFS, SUBMIT_MEAL_PLAN, REJECT_REQUEST, IMPLS
 
 SYSTEM = (Path(__file__).parent / "prompts" / "suggester.md").read_text()
-TOOLS = [GET_MEALS, GET_USER_PREFS, SUBMIT_SUGGESTIONS]
+TOOLS = [SEARCH_PRODUCTS, GET_MEALS, GET_USER_PREFS, SUBMIT_MEAL_PLAN, REJECT_REQUEST]
+FINISHERS = {"submit_meal_plan", "reject_request"}
 
 
-def suggest(user_slack_ids: list, last_two_weeks_meal_ids: list) -> list:
-    """Return up to 5 meal dicts: [{meal_id, rationale}, ...]"""
-    user_msg = (
-        f"Users: {user_slack_ids}\n"
-        f"Meals served in the last two weeks (avoid repeats): {last_two_weeks_meal_ids}"
-    )
-    resp = run_agent(SYSTEM, user_msg, TOOLS, IMPLS, finisher="submit_suggestions")
-    # The finisher tool wrote structured output; find it in the last tool_use block.
+def suggest(user_slack_id, mood, half, previous=None, feedback=None):
+    """
+    Propose (or refine) a lunch plan.
+    Returns {product_lines: [{product_id, qty}], half, notes}
+    or {rejected: reason}.
+    """
+    parts = [f"User: {user_slack_id}", f"Delivery half: {half}"]
+    parts.append("Mood/preferences: %s" % (mood.strip() if mood and mood.strip()
+                                           else "none given — surprise them"))
+    if previous:
+        parts.append("REFINEMENT — previous suggestion (product lines): %s"
+                     % json.dumps(previous.get("product_lines", [])))
+        parts.append("Previous pitch: %s" % previous.get("notes", ""))
+        parts.append("User feedback on it: %s" % (feedback or ""))
+    resp = run_agent(SYSTEM, "\n".join(parts), TOOLS, IMPLS, max_turns=8, finisher=FINISHERS)
     for block in resp.content:
-        if getattr(block, "type", None) == "tool_use" and block.name == "submit_suggestions":
-            return block.input["meals"]
-    # Fallback: agent answered in text (shouldn't happen with a well-written prompt)
-    raise RuntimeError(f"suggester did not call submit_suggestions: {resp}")
+        if getattr(block, "type", None) == "tool_use":
+            if block.name == "submit_meal_plan":
+                return block.input
+            if block.name == "reject_request":
+                return {"rejected": block.input.get("reason", "That's not something I can help with.")}
+    raise RuntimeError(f"suggester did not call a finisher tool: {resp}")

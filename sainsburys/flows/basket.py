@@ -1,3 +1,5 @@
+import json
+
 import store
 from agents import parser as parser_agent
 from datetime import date, timedelta
@@ -114,6 +116,87 @@ def prefilled_order_modal(selection_id):
         modal["blocks"][1]["element"]["initial_option"] = {
             "text": {"type": "plain_text", "text": label}, "value": half}
     return modal
+
+
+# ── /suggest: open suggestions with an accept/refine loop ──────────────────────
+
+def _send_suggestion(client, dm_channel, selection_id, result, mood):
+    product_ids = [line["product_id"] for line in result.get("product_lines", [])]
+    products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
+    lines_text = _format_lines(result.get("product_lines", []), products)
+    client.chat_postMessage(
+        channel=dm_channel,
+        text="Suggestion: %s" % (result.get("notes") or lines_text),
+        blocks=blocks.suggestion_blocks(selection_id, lines_text,
+                                        result.get("notes") or "", mood),
+    )
+
+
+def handle_suggest_submit(body, client):
+    from agents import suggester
+    user_id = body["user"]["id"]
+    user_name = body["user"].get("username", body["user"].get("name", user_id))
+    values = body["view"]["state"]["values"]
+    mood = (values["suggest_mood"]["mood"].get("value") or "").strip()
+    half = values["suggest_half"]["half"]["selected_option"]["value"]
+    week = _current_week()
+
+    store.ensure_user(user_id, user_name)
+    dm = client.conversations_open(users=user_id)
+    dm_channel = dm["channel"]["id"]
+    client.chat_postMessage(channel=dm_channel, text=":bulb: Thinking up a lunch for you...")
+
+    print("[suggest] user=%s half=%s mood=%r" % (user_id, half, mood), flush=True)
+    try:
+        result = suggester.suggest(user_id, mood, half)
+        if result.get("rejected"):
+            client.chat_postMessage(channel=dm_channel, text=":no_good: %s" % result["rejected"])
+            return
+        row = store.record_selection(user_id, week, half, freeform=mood or "(surprise me)",
+                                     parsed=result, status="proposed")
+        print("[suggest] proposed selection id=%s" % row["id"], flush=True)
+        _send_suggestion(client, dm_channel, row["id"], result, mood)
+    except Exception as e:
+        client.chat_postMessage(
+            channel=dm_channel,
+            text=":warning: Couldn't come up with a suggestion (%s: %s) — try again "
+                 "or use /order directly." % (type(e).__name__, e),
+        )
+
+
+def handle_refine_submit(body, client):
+    """User told us what to change about a proposed suggestion."""
+    from agents import suggester
+    selection_id = int(body["view"]["private_metadata"])
+    feedback = body["view"]["state"]["values"]["refine_text"]["feedback"]["value"]
+    user_id = body["user"]["id"]
+
+    dm = client.conversations_open(users=user_id)
+    dm_channel = dm["channel"]["id"]
+
+    sel = store.get_selection(selection_id)
+    if not sel or sel["status"] != "proposed":
+        client.chat_postMessage(channel=dm_channel,
+                                text="🤔 That suggestion is gone — run /suggest again.")
+        return
+
+    client.chat_postMessage(channel=dm_channel, text=":bulb: Reworking it...")
+    print("[suggest] refine id=%s feedback=%r" % (selection_id, feedback), flush=True)
+    try:
+        previous = json.loads(sel["parsed"]) if sel["parsed"] else None
+        result = suggester.suggest(user_id, sel["freeform"], sel["half"],
+                                   previous=previous, feedback=feedback)
+        if result.get("rejected"):
+            client.chat_postMessage(channel=dm_channel, text=":no_good: %s" % result["rejected"])
+            return
+        store.update_selection_parsed(selection_id, result, status="proposed")
+        _send_suggestion(client, dm_channel, selection_id, result, sel["freeform"])
+    except Exception as e:
+        client.chat_postMessage(
+            channel=dm_channel,
+            text=":warning: Refinement failed (%s: %s) — the previous suggestion "
+                 "still stands." % (type(e).__name__, e),
+        )
 
 
 # Team decision: no delivery tracking — /order writes selections, and the
