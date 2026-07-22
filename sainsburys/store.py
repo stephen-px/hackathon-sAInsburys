@@ -450,15 +450,17 @@ def leftovers(week=None):
     return [item for item in out.values() if item["qty_left"] > 0.01]
 
 
-def claim_product(product_id, user):
+def claim_product(product_id, user, qty=1.0):
     """
-    One-tap claim: log a 'claimed' event for one unit (or whatever fraction is
-    left). Raises ValueError if nothing is left. Returns {name, value, qty_left}.
+    One-tap claim: log a 'claimed' event. Defaults to one unit (the Slack
+    one-tap behaviour); pass a larger qty (e.g. the whole remaining lot from the
+    dashboard) to claim more in a single event. Never claims more than is left.
+    Raises ValueError if nothing is left. Returns {name, value, qty_left}.
     """
     item = next((i for i in leftovers() if i["product_id"] == product_id), None)
     if not item:
         raise ValueError("nothing left of product %s" % product_id)
-    qty = min(1.0, item["qty_left"])
+    qty = min(float(qty), item["qty_left"])
     value = round(qty * item["price"], 2)
     _q(
         "insert into events (kind, user_slack_id, product_id, qty, value) "

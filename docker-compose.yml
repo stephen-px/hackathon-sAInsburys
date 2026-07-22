@@ -47,6 +47,10 @@ services:
       - .:/app
     env_file:
       - sainsburys/.env
+    environment:
+      # Mock is OFF by default → the dashboard shows real DB data (or empty).
+      # Set DASHBOARD_MOCK=1 in your shell/.env for the wifi-down demo safety net.
+      DASHBOARD_MOCK: "${DASHBOARD_MOCK:-0}"
     depends_on:
       init:
         condition: service_completed_successfully

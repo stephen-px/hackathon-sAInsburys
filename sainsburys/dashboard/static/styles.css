@@ -1,0 +1,106 @@
+@import url('https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-sans/style.css');
+@import url('https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-mono/style.css');
+
+:root {
+  --color-key-primary:            #578cff;
+  --color-key-error:              #ff5359;
+  --color-key-success:            #05a831;
+  --color-key-warning:            #e96d00;
+  --color-border:                 #aaabb1;
+  --color-border-subtle:          #2e3035;
+  --color-surface-1:              #191c20;
+  --color-surface-canvas:         #0c0e13;
+  --color-on-surface:             #ffffff;
+  --color-on-surface-subtle:      #aaabb1;
+  --color-container-surface:      #1d2024;
+  --color-container-surface-low:  #0c0e13;
+  --color-container-surface-high: #32353a;
+  --color-elevation-inset:        rgba(255,255,255,0.08);
+  --color-elevation-2-shadow:     rgba(0,0,0,0.32);
+}
+html.light {
+  --color-key-primary:            #006efe;
+  --color-key-error:              #ee0033;
+  --color-key-warning:            #e96d00;
+  --color-border-subtle:          #d6d7dd;
+  --color-surface-1:              #f3f3fa;
+  --color-surface-canvas:         #f0f0f8;
+  --color-on-surface:             #111318;
+  --color-on-surface-subtle:      #5c5e64;
+  --color-container-surface:      #ffffff;
+  --color-container-surface-low:  #ededf4;
+  --color-container-surface-high: #e1e2e9;
+  --color-elevation-inset:        rgba(0,0,0,0.1);
+  --color-elevation-2-shadow:     rgba(0,0,0,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Geist', sans-serif;
+  background: var(--color-surface-canvas);
+  color: var(--color-on-surface);
+  font-size: 13px;
+  line-height: 1.4;
+}
+* { scrollbar-width: thin; scrollbar-color: #525252 transparent; }
+*::-webkit-scrollbar { width: 4px; height: 4px; }
+*::-webkit-scrollbar-thumb { background: #525252; border-radius: 9999px; }
+.mi {
+  font-family: 'Material Icons Outlined';
+  font-size: 16px; font-style: normal; line-height: 1;
+  display: inline-block; vertical-align: middle; user-select: none;
+}
+
+@keyframes float-up {
+  0%   { opacity: 1; transform: translateY(0) translateX(-50%); }
+  100% { opacity: 0; transform: translateY(-90px) translateX(-50%); }
+}
+@keyframes count-bounce {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(1.08) translateY(-4px); }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,83,89,0.2), inset 0 0 0 1px rgba(255,255,255,0.04); }
+  50%       { box-shadow: 0 0 0 2px rgba(255,83,89,0.6), inset 0 0 0 1px rgba(255,255,255,0.04); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(100px) scale(0.92); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes ripple {
+  0%   { transform: scale(0); opacity: 0.7; }
+  100% { transform: scale(4); opacity: 0; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes feed-enter {
+  from { opacity: 0; transform: translateY(-6px); max-height: 0; }
+  to   { opacity: 1; transform: translateY(0); max-height: 60px; }
+}
+@keyframes glow {
+  0%, 100% { opacity: 0.07; }
+  50%       { opacity: 0.18; }
+}
+@keyframes hp-flash {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+@keyframes xp-grow {
+  from { width: 0%; }
+}
+
+/* ── Morrison mascot ────────────────────────────────────────────────── */
+@keyframes morrison-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+@keyframes morrison-blink { 0%,87%,100%{transform:scaleY(1)} 91%{transform:scaleY(0.08)} }
+@keyframes morrison-wiggle { 0%{transform:rotate(0deg) translateY(0)} 15%{transform:rotate(-12deg) translateY(-4px)} 30%{transform:rotate(12deg) translateY(-6px)} 45%{transform:rotate(-10deg) translateY(-4px)} 60%{transform:rotate(8deg) translateY(-3px)} 75%{transform:rotate(-5deg) translateY(-1px)} 100%{transform:rotate(0deg) translateY(0)} }
+@keyframes morrison-squish { 0%{transform:scale(1,1)} 20%{transform:scale(1.15,0.88)} 40%{transform:scale(0.9,1.1)} 60%{transform:scale(1.08,0.94)} 80%{transform:scale(0.96,1.04)} 100%{transform:scale(1,1)} }
+.morrison-svg { animation: morrison-bob 3.2s ease-in-out infinite; cursor: pointer; }
+.morrison-svg:hover { filter: brightness(1.08); }
+.morrison-svg.tickled { animation: morrison-wiggle 0.55s ease-in-out; }
+.morrison-el { transform-origin: 100px 116px; }
+.morrison-er { transform-origin: 148px 116px; }
+.morrison-blink-l { animation: morrison-blink var(--blink-dur, 4.5s) ease-in-out infinite; }
+.morrison-blink-r { animation: morrison-blink var(--blink-dur, 4.5s) ease-in-out infinite 0.12s; }
