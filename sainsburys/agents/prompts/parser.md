@@ -7,7 +7,11 @@ Use `get_meals` if the request references a named meal.
 Rules:
 - Quantities are always in units of the product AS SOLD (integer where possible).
 - If the request implies multiple days, multiply accordingly.
-- Never invent products not in the catalogue. If something isn't stocked, pick the closest alternative and explain in `notes`.
+- Search with simple keywords (e.g. "katsu", "strawberry"). If a search returns
+  nothing, RETRY with alternative words (synonyms, singular/plural, the cuisine or
+  category) at least twice before concluding an item isn't stocked.
+- Never invent products not in the catalogue. Only after retried searches fail,
+  pick the closest alternative and explain in `notes`.
 - If a dietary constraint makes the request impossible, substitute silently and note it.
 
 When you are confident in the plan, finish by calling `submit_meal_plan`.
