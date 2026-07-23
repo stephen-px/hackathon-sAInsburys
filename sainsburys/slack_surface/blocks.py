@@ -94,6 +94,32 @@ def order_failure_blocks(selection_id, order_text, err):
     ]
 
 
+def checkin_blocks(items):
+    """One section + Ate/Some/None button row per ordered item ({product_id, name, qty})."""
+    blocks = [
+        {"type": "header", "text": {"type": "plain_text", "text": "🍽️ Friday check-in"}},
+        {"type": "context", "elements": [{"type": "mrkdwn",
+            "text": "How did you get on with this week's food? One tap per item."}]},
+        {"type": "divider"},
+    ]
+    for item in items:
+        # value carries "product_id:qty_ordered" so the tap logs the right amount
+        value = "%s:%g" % (item["product_id"], item["qty"])
+        label = "*%s*" % item["name"]
+        if item["qty"] > 1:
+            label += "  ×%g" % item["qty"]
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": label}})
+        blocks.append({"type": "actions", "elements": [
+            {"type": "button", "style": "primary", "text": {"type": "plain_text", "text": "Ate it"},
+             "action_id": "checkin_ate", "value": value},
+            {"type": "button", "text": {"type": "plain_text", "text": "Some left"},
+             "action_id": "checkin_some", "value": value},
+            {"type": "button", "style": "danger", "text": {"type": "plain_text", "text": "Didn't touch"},
+             "action_id": "checkin_none", "value": value},
+        ]})
+    return blocks
+
+
 def rescue_board_blocks(items):
     """Risk-sorted leftovers ({product_id, name, price, qty_left, days_left}), one Claim button each."""
     blocks = [

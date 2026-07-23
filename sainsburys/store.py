@@ -284,6 +284,96 @@ def build_baskets(week):
     return orders
 
 
+# ── Check-in / consumption ────────────────────────────────────────────────────
+
+def users_with_selections(week):
+    """Slack ids of everyone with a selection this week (who to DM for check-in)."""
+    rows = _q(
+        "select distinct user_slack_id from selections where week = ?",
+        (str(week),),
+        fetch="all",
+    ) or []
+    return [r["user_slack_id"] for r in rows]
+
+
+def open_items_for(user, week):
+    """
+    What the user ordered this week, straight from their selections
+    (meal picks expanded to products, freeform via the parsed plan).
+    Returns [{product_id, name, qty}] — the list the check-in DM shows.
+    """
+    selections = _q(
+        "select meal_id, parsed from selections "
+        "where user_slack_id = ? and week = ? and status not in ('void', 'proposed')",
+        (user, str(week)),
+        fetch="all",
+    ) or []
+
+    qty_by_product = {}
+    for sel in selections:
+        if sel["meal_id"]:
+            lines = _q(
+                "select product_id, qty from meal_products where meal_id = ?",
+                (sel["meal_id"],),
+                fetch="all",
+            ) or []
+        elif sel["parsed"]:
+            lines = json.loads(sel["parsed"]).get("product_lines", [])
+        else:
+            continue
+        for line in lines:
+            pid = line["product_id"]
+            qty_by_product[pid] = qty_by_product.get(pid, 0) + line["qty"]
+
+    items = []
+    for pid, qty in qty_by_product.items():
+        product = _q("select id, name from products where id = ?", (pid,), fetch="one")
+        if product:
+            items.append({"product_id": pid, "name": product["name"], "qty": qty})
+    return items
+
+
+def record_consumption(user, product_id, fraction, qty_ordered=1.0):
+    """
+    Log a Friday check-in answer: 'consumed' event for fraction of the user's
+    ordered quantity. fraction in [0, 1] (Ate=1, Some=0.5, None=0).
+    Events are append-only; readers take the LATEST answer per user+product.
+    Eating (and saying so) shrinks both the rescue board and your waste score.
+    Returns {product_id, name, qty, value}.
+    """
+    product = _q(
+        "select id, name, price from products where id = ?",
+        (product_id,),
+        fetch="one",
+    )
+    if not product:
+        raise ValueError("unknown product %s" % product_id)
+    qty = float(fraction) * float(qty_ordered)
+    value = round(qty * product["price"], 2)
+    _q(
+        "insert into events (kind, user_slack_id, product_id, qty, value) "
+        "values ('consumed', ?, ?, ?, ?)",
+        (user, product_id, qty, value),
+    )
+    return {"product_id": product_id, "name": product["name"], "qty": qty, "value": value}
+
+
+def user_week_summary(user, week):
+    """£ ordered vs £ eaten (latest answer per product) — for the check-in wrap-up."""
+    items = open_items_for(user, week)
+    prices = {p["id"]: p["price"] for p in get_products_by_ids([i["product_id"] for i in items])}
+    ordered_value = round(sum(i["qty"] * float(prices.get(i["product_id"], 0)) for i in items), 2)
+    row = _q(
+        "select sum(value) as eaten from ("
+        "  select value, row_number() over (partition by product_id order by ts desc, id desc) as rn"
+        "  from events where kind = 'consumed' and user_slack_id = ? and date(ts) >= ?"
+        ") where rn = 1",
+        (user, str(week)),
+        fetch="one",
+    )
+    return {"ordered_value": ordered_value, "eaten_value": round(row["eaten"] or 0, 2)}
+
+
 # ── Rescue board ──────────────────────────────────────────────────────────────
 
 def leftovers(week=None):

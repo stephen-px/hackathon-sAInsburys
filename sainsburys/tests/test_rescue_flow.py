@@ -66,26 +66,31 @@ def main():
                            parsed={"product_lines": [{"product_id": 2, "qty": 5}]})
     assert abs(_left(monday).get(2, 0) - 1.0) < 1e-6, "proposed rows leaked onto the board"
 
-    # 3) Claims subtract from the pool.
-    store.claim_product(1, "U2", qty=2)  # Ben rescues 2 hummus (£3.00 claimed)
-    assert abs(_left(monday).get(1, 0) - 2.0) < 1e-6, "claim didn't subtract"
+    # 3) Check-in answers subtract from the board (no gate — just reduction).
+    #    Ada says "Some left" on her 2 hummus -> ate 1 -> board drops 4 -> 3.
+    store.record_consumption("U1", product_id=1, fraction=0.5, qty_ordered=2)
+    assert abs(_left(monday).get(1, 0) - 3.0) < 1e-6, "check-in didn't reduce the board"
 
-    # 4) /reset sweep: remaining 2 hummus wasted, split evenly between Ada & Ben
-    #    (2 left of 4 unconsumed -> each wastes 1 = £1.50); Ben also bins his wrap.
+    # 4) Claims subtract from the pool.
+    store.claim_product(1, "U2", qty=2)  # Ben rescues 2 hummus (£3.00 claimed)
+    assert abs(_left(monday).get(1, 0) - 1.0) < 1e-6, "claim didn't subtract"
+
+    # 5) /reset sweep: hummus pool = Ada 1 + Ben 2 unconsumed, 1 left after claims
+    #    -> waste prorated by share (Ada ⅓, Ben ⅔); Ben also bins his £3 wrap.
     digest = store.sweep_waste(monday)
     assert digest["wasted_items"] == 2, digest
-    assert abs(digest["wasted_value"] - (2 * 1.50 + 3.00)) < 0.01, digest
+    assert abs(digest["wasted_value"] - 4.50) < 0.05, digest
     by = {w["slack_id"]: w["wasted"] for w in digest["by_user"]}
-    assert abs(by["U1"] - 1.50) < 0.01, by     # Ada: 1 hummus binned
-    assert abs(by["U2"] - 4.50) < 0.01, by     # Ben: 1 hummus + 1 wrap binned
+    assert abs(by["U1"] - 0.50) < 0.02, by     # Ada: ⅓ of the leftover hummus
+    assert abs(by["U2"] - 4.00) < 0.02, by     # Ben: ⅔ hummus + the wrap
     assert digest["by_user"][0]["slack_id"] == "U2", "Ben should top the wall of shame"
 
-    # 5) Net leaderboard: Ben claimed £3.00, wasted £4.50 -> net -1.50; Ada -> -1.50.
+    # 6) Net leaderboard: Ben claimed £3.00, wasted £4.00 -> net -1.00; Ada -0.50.
     board = {r["slack_id"]: r for r in store.leaderboard()}
-    assert abs(board["U2"]["net"] - (3.00 - 4.50)) < 0.01, board
-    assert abs(board["U1"]["net"] - (-1.50)) < 0.01, board
+    assert abs(board["U2"]["net"] - (-1.00)) < 0.02, board
+    assert abs(board["U1"]["net"] - (-0.50)) < 0.02, board
 
-    # 6) Wipe clears orders but keeps the score history.
+    # 7) Wipe clears orders but keeps the score history.
     store.wipe_orders()
     conn = sqlite3.connect(_tmp.name)
     sels, evs = conn.execute(

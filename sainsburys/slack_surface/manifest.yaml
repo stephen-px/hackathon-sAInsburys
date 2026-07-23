@@ -8,6 +8,8 @@ features:
       description: Order lunch — exact request, a mood, or blank for a suggestion
     - command: /suggest
       description: Same as /order — the bot picks when you don't
+    - command: /demo-checkin
+      description: Send Friday what-did-you-eat DMs
     - command: /demo-rescue
       description: Post the rescue board with one-tap claiming
     - command: /reset

@@ -92,6 +92,34 @@ def register(app):
 
         _run(respond, _go)
 
+    # ── /demo-checkin (Friday: what did you eat?) ───────────────────────────────
+
+    @app.command("/demo-checkin")
+    def demo_checkin(ack, respond, client):
+        ack()
+
+        def _go():
+            sent = rescue.send_checkin_dms(client)
+            respond({"text": "📬 Check-in DMs sent to %d user(s)." % sent,
+                     "response_type": "ephemeral", "replace_original": False})
+
+        _run(respond, _go)
+
+    @app.action("checkin_ate")
+    def on_checkin_ate(ack, respond, body, client):
+        ack()
+        _run(respond, lambda: _record_checkin(respond, body, client, fraction=1.0))
+
+    @app.action("checkin_some")
+    def on_checkin_some(ack, respond, body, client):
+        ack()
+        _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.5))
+
+    @app.action("checkin_none")
+    def on_checkin_none(ack, respond, body, client):
+        ack()
+        _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.0))
+
     # ── /reset (end-of-week sweep: waste logged & scored, orders wiped) ─────────
 
     @app.command("/reset")
@@ -195,6 +223,37 @@ def _replace_actions(respond, body, note, value=None):
             new_blocks.append(block)
     respond({"blocks": new_blocks, "text": note, "replace_original": True})
     return new_blocks
+
+
+def _record_checkin(respond, body, client, fraction):
+    raw = body["actions"][0]["value"]          # "product_id:qty" (older DMs: just id)
+    product_id, _, qty_str = raw.partition(":")
+    product_id, qty_ordered = int(product_id), float(qty_str or 1)
+    user = body["user"]["id"]
+    try:
+        result = store.record_consumption(user, product_id, fraction, qty_ordered)
+    except ValueError:
+        # Stale DM: sent before a reset/refactor, or by a bot instance with a
+        # different local lunch.db — its button ids don't resolve here.
+        respond({"text": "🤔 That button is from an older check-in and I can't match "
+                         "it any more. Run `/demo-checkin` for a fresh one.",
+                 "response_type": "ephemeral", "replace_original": False})
+        return
+
+    label = {1.0: "✅ Ate it", 0.5: "🥡 Some left", 0.0: "🙈 Didn't touch"}[fraction]
+    new_blocks = _replace_actions(respond, body, "%s — *%s*" % (label, result["name"]), value=raw)
+
+    # All items answered? Post the weekly wrap-up.
+    if not any(b.get("type") == "actions" for b in new_blocks):
+        from flows.basket import _current_week
+        summary = store.user_week_summary(user, _current_week())
+        client.chat_postMessage(
+            channel=_channel_id(body),
+            thread_ts=body["message"]["ts"],
+            text="🧾 All done! You ate *£%.2f* of your *£%.2f* order this week. "
+                 "Whatever's left stays on the rescue board 🛟" % (
+                summary["eaten_value"], summary["ordered_value"]),
+        )
 
 
 def _refine_modal(selection_id):
