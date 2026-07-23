@@ -13,6 +13,17 @@ const fmt  = n => '£' + Number(n).toFixed(2);
 const Icon = ({ name, size = 16, color }) =>
   <span className="mi" style={{ fontSize: size, color }}>{name}</span>;
 
+/* Product name as a sainsburys.co.uk link — real product page when mapped,
+   search deep-link on the exact name otherwise. */
+const ProdLink = ({ name, url }) => (
+  <a href={url || 'https://www.sainsburys.co.uk/gol-ui/SearchResults/' + encodeURIComponent(name)}
+     target="_blank" rel="noopener noreferrer"
+     style={{ color: 'inherit', textDecoration: 'underline',
+              textDecorationColor: 'var(--color-border-subtle)', textUnderlineOffset: 2 }}>
+    {name}
+  </a>
+);
+
 function PXMark({ size = 22 }) {
   return <img src="/assets/px-logo.png" width={size} height={size} style={{ display:'block', objectFit:'contain' }} alt="PX" />;
 }

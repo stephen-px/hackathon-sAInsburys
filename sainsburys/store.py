@@ -178,7 +178,7 @@ def get_products_by_ids(ids):
         return []
     placeholders = ",".join("?" * len(ids))
     return _q(
-        "select id, name, price from products where id in (%s)" % placeholders,
+        "select id, name, price, url, sainsburys_uid from products where id in (%s)" % placeholders,
         tuple(ids),
         fetch="all",
     ) or []
@@ -237,7 +237,7 @@ def build_baskets(week):
                 ).fetchone()
                 if existing:
                     lines = conn.execute(
-                        "select p.name, ol.qty, ol.unit_price "
+                        "select p.name, ol.qty, ol.unit_price, p.url "
                         "from order_lines ol join products p on p.id = ol.product_id "
                         "where ol.order_id = ?", (existing["id"],)
                     ).fetchall()
@@ -271,17 +271,47 @@ def build_baskets(week):
             lines = []
             for pid, qty in qty_by_product.items():
                 product = conn.execute(
-                    "select name, price from products where id = ?", (pid,)
+                    "select name, price, url from products where id = ?", (pid,)
                 ).fetchone()
                 conn.execute(
                     "insert into order_lines (order_id, product_id, qty, unit_price) values (?, ?, ?, ?)",
                     (order_id, pid, qty, product["price"]),
                 )
                 lines.append({"product_id": pid, "name": product["name"],
-                              "qty": qty, "unit_price": product["price"]})
+                              "qty": qty, "unit_price": product["price"],
+                              "url": product["url"]})
             orders.append({"id": order_id, "week": str(week), "delivery_date": str(delivery),
                            "status": "draft", "lines": lines})
     return orders
+
+
+def order_lines(order_id):
+    """Lines for one order, with any cached Sainsbury's mapping.
+
+    Returns [{product_id, name, qty, unit_price, sainsburys_uid, url}]."""
+    return _q(
+        "select ol.product_id, p.name, ol.qty, ol.unit_price, p.sainsburys_uid, p.url "
+        "from order_lines ol join products p on p.id = ol.product_id "
+        "where ol.order_id = ?",
+        (order_id,),
+        fetch="all",
+    ) or []
+
+
+def products_missing_sainsburys():
+    """Products not yet mapped to a live sainsburys.co.uk uid (for backfill)."""
+    return _q(
+        "select id, name from products where sainsburys_uid is null order by id",
+        fetch="all",
+    ) or []
+
+
+def set_product_sainsburys(product_id, uid, url=None):
+    """Cache a product's live sainsburys.co.uk identity (uid + product page url)."""
+    _q(
+        "update products set sainsburys_uid = ?, url = coalesce(?, url) where id = ?",
+        (uid, url, product_id),
+    )
 
 
 def approve_order(order_id):
@@ -340,9 +370,10 @@ def open_items_for(user, week):
 
     items = []
     for pid, qty in qty_by_product.items():
-        product = _q("select id, name from products where id = ?", (pid,), fetch="one")
+        product = _q("select id, name, url from products where id = ?", (pid,), fetch="one")
         if product:
-            items.append({"product_id": pid, "name": product["name"], "qty": qty})
+            items.append({"product_id": pid, "name": product["name"], "qty": qty,
+                          "url": product["url"]})
     return items
 
 
@@ -426,7 +457,7 @@ def leftovers(week=None):
             for line in lines:
                 pid = line["product_id"]
                 product = _q(
-                    "select name, price, shelf_life_days from products where id = ?",
+                    "select name, price, shelf_life_days, url from products where id = ?",
                     (pid,),
                     fetch="one",
                 )
@@ -439,7 +470,7 @@ def leftovers(week=None):
                     meta[pid]["days_left"] = min(meta[pid]["days_left"], days_left)
                 else:
                     meta[pid] = {"name": product["name"], "price": product["price"],
-                                 "days_left": days_left}
+                                 "days_left": days_left, "url": product["url"]}
 
     # Consumed: the LATEST check-in answer per user+product (repeat taps correct,
     # not accumulate). Its presence for a (user, product) is the "checked in" signal:
@@ -465,7 +496,7 @@ def leftovers(week=None):
         else:
             m = meta[pid]
             out[pid] = {"product_id": pid, "name": m["name"], "price": m["price"],
-                        "qty_left": left, "days_left": m["days_left"]}
+                        "qty_left": left, "days_left": m["days_left"], "url": m["url"]}
 
     # Claimed: every claim (or sweep) counts — each is food leaving the fridge. These
     # subtract from the product-level pool (anyone can claim what's on the board).

@@ -72,7 +72,7 @@ function RescueBoard({ items }) {
                   animation: crit ? 'pulse-red 2.5s ease infinite' : 'none',
                   transition:'background 0.2s',
                 }}>
-                  <td style={{ padding:'11px 16px', fontSize:13, fontWeight:500 }}>{item.name}</td>
+                  <td style={{ padding:'11px 16px', fontSize:13, fontWeight:500 }}><ProdLink name={item.name} url={item.url} /></td>
                   <td style={{ padding:'11px 16px' }}><ExpiryBadge days={item.days_left}/></td>
                   <td style={{ padding:'11px 16px', textAlign:'right', fontFamily:"'Geist Mono',monospace", fontSize:12, color:'var(--color-on-surface-subtle)' }}>
                     ×{item.qty_remaining}

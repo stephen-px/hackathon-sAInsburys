@@ -13,7 +13,8 @@ RUN pip install --no-cache-dir \
     anthropic \
     apscheduler \
     python-dotenv \
-    flask
+    flask \
+    requests
 
 # Default command — overridden per service in docker-compose.yml
 CMD ["python", "sainsburys/app.py"]

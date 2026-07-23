@@ -28,11 +28,16 @@ open_items_for(user, week) -> list[{product_id, name, qty}]
 record_consumption(user, product_id, fraction) -> {product_id, name, qty, value}
 
 # Basket aggregation (implemented — future /demo-aggregate)
-build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price}]
+build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price, url}]
 approve_order(order_id) -> Order
+order_lines(order_id) -> list[{product_id, name, qty, unit_price, sainsburys_uid, url}]
+
+# Real Sainsbury's mapping (products.sainsburys_uid / products.url)
+products_missing_sainsburys() -> list[{id, name}]
+set_product_sainsburys(product_id, uid, url=None) -> None
 
 # Rescue board (implemented — /demo-rescue; product-keyed, no lots)
-leftovers(week=None) -> list[{product_id, name, price, qty_left, days_left}]
+leftovers(week=None) -> list[{product_id, name, price, qty_left, days_left, url}]
 claim_product(product_id, user) -> {product_id, name, value, qty_left}
 
 # TODO — not yet implemented
@@ -64,6 +69,32 @@ weekly_totals() -> list
 | callback_id  | handler                  |
 |--------------|--------------------------|
 | order_submit | handlers.on_order_submit |
+
+## grocery.py — real sainsburys.co.uk integration (ADD TO BASKET ONLY)
+
+```python
+# Session comes from a one-time Playwright login (vendor/uk-grocery-cli —
+# not committed; clone + install it once per machine):
+#   git clone https://github.com/abracadabra50/uk-grocery-cli vendor/uk-grocery-cli
+#   cd vendor/uk-grocery-cli && npm install && npx playwright install chromium
+#   npm run groc login -- --email YOU --password PW
+#   → saves ~/.sainsburys/session.json (SMS 2FA prompt in terminal)
+# Saved to ~/.sainsburys/session.json. Search works anonymously; basket
+# writes need the session. NO slot booking / checkout code exists.
+grocery.search(query, limit=8) -> list[{product_uid, name, price, url, in_stock}]
+grocery.add_to_basket(product_uid, qty) -> None
+grocery.get_basket() -> {items, item_count, total}
+grocery.is_connected() -> bool
+grocery.push_lines(lines) -> {added, failed, resolved, total, trolley_url}
+
+# Orchestration (flows/basket.py):
+push_to_trolley(order_id) -> result      # called on Approve; caches resolved uids
+trolley_summary_text(result) -> str      # Slack mrkdwn summary
+
+# Product identity cache: data/backfill_sainsburys.py maps all catalogue
+# products to real uids/urls (anonymous search) and writes them back into
+# catalogue.csv so /demo-reset and re-seeds keep them.
+```
 
 ## Rules
 - Changing a store.py signature = tell the group first.

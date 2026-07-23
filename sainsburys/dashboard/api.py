@@ -201,7 +201,7 @@ def rescue():
         return jsonify([
             {"id": i["product_id"], "name": i["name"], "days_left": i["days_left"],
              "qty_remaining": i["qty_left"], "price": i["price"],
-             "risk_score": round(_rescue_risk(i), 2)}
+             "risk_score": round(_rescue_risk(i), 2), "url": i.get("url")}
             for i in items
         ])
     except Exception:
@@ -231,7 +231,7 @@ def basket():
         orders = []
         for o in cur.fetchall():
             cur.execute("""
-                SELECT p.name, ol.qty, ol.unit_price
+                SELECT p.name, ol.qty, ol.unit_price, p.url
                 FROM order_lines ol
                 JOIN products p ON p.id = ol.product_id
                 WHERE ol.order_id = ?

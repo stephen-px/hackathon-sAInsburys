@@ -12,7 +12,10 @@ services:
       - sainsburys/.env
 
   # ── Demo data seeder (run once to populate real data for the dashboard) ──────
+  # Opt-in (like bot): a plain `docker compose up` must NEVER wipe live state.
+  # Run explicitly with: docker compose --profile demo up demo
   demo:
+    profiles: ["demo"]
     build: .
     command: python sainsburys/data/demo_reset.py
     volumes:
@@ -30,6 +33,9 @@ services:
     command: python sainsburys/app.py
     volumes:
       - .:/app
+      # Sainsbury's session (from vendor/uk-grocery-cli login) so Approve can
+      # fill the real trolley. Read-only; absent file just skips the push.
+      - ${HOME}/.sainsburys:/root/.sainsburys:ro
     env_file:
       - sainsburys/.env
     depends_on:

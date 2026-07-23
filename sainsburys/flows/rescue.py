@@ -14,7 +14,8 @@ def send_checkin_dms(client):
         dm = client.conversations_open(users=user)
         client.chat_postMessage(channel=dm["channel"]["id"],
                                 text="Friday check-in — how did you get on?",
-                                blocks=blocks.checkin_blocks(items))
+                                blocks=blocks.checkin_blocks(items),
+                                unfurl_links=False, unfurl_media=False)
         sent += 1
     return sent
 
@@ -41,7 +42,8 @@ def post_board(client, channel):
         return
     client.chat_postMessage(channel=channel,
                             text="🛟 Rescue board — claim it before it's binned",
-                            blocks=board)
+                            blocks=board,
+                            unfurl_links=False, unfurl_media=False)
     # Personalised top-3 DMs (agents/personaliser.py, Track B) plug in here.
 
 

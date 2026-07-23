@@ -1,4 +1,21 @@
 # Block Kit builders — TODO
+from urllib.parse import quote
+
+
+def _esc(text):
+    """Slack mrkdwn escaping (required inside <url|text> links)."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def plink(name, url=None):
+    """Product name as a clickable sainsburys.co.uk link.
+
+    Uses the real product page when we've mapped it; otherwise a search
+    deep-link on the exact catalogue name (always lands, top hit is right)."""
+    href = url or "https://www.sainsburys.co.uk/gol-ui/SearchResults/%s" % quote(name)
+    return "<%s|%s>" % (href, _esc(name))
+
+
 def meal_picker_blocks(suggestions): raise NotImplementedError
 def basket_blocks(order):
     """Block Kit message for one draft basket order with an Approve button."""
@@ -6,7 +23,8 @@ def basket_blocks(order):
     total = sum(l["qty"] * l["unit_price"] for l in lines)
     delivery = order["delivery_date"]
     items_text = "\n".join(
-        "• %gx *%s* — £%.2f" % (l["qty"], l["name"], l["qty"] * l["unit_price"])
+        "• %gx *%s* — £%.2f" % (l["qty"], plink(l["name"], l.get("url")),
+                                l["qty"] * l["unit_price"])
         for l in lines
     ) or "_No items_"
     return [
@@ -103,7 +121,8 @@ def rescue_board_blocks(items):
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn", "text": "*%s*\n£%.2f · %g left · %s" % (
-                item["name"], float(item["price"]), item["qty_left"], urgency)},
+                plink(item["name"], item.get("url")), float(item["price"]),
+                item["qty_left"], urgency)},
             "accessory": {"type": "button", "style": "primary",
                           "text": {"type": "plain_text", "text": "Claim"},
                           "action_id": "claim", "value": str(item["product_id"])},
@@ -122,7 +141,7 @@ def checkin_blocks(items):
     for item in items:
         # value carries "product_id:qty_ordered" so the tap logs the right amount
         value = "%s:%g" % (item["product_id"], item["qty"])
-        label = "*%s*" % item["name"]
+        label = "*%s*" % plink(item["name"], item.get("url"))
         if item["qty"] > 1:
             label += "  ×%g" % item["qty"]
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": label}})

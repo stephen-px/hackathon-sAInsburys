@@ -13,7 +13,8 @@ create table if not exists products (
   category         text,
   price            real,
   shelf_life_days  integer,
-  url              text
+  url              text,
+  sainsburys_uid   text
 );
 
 create table if not exists meals (

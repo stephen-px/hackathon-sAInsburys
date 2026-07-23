@@ -11,7 +11,8 @@ create table products (
   category         text,
   price            numeric,
   shelf_life_days  int,
-  url              text
+  url              text,
+  sainsburys_uid   text
 );
 
 create table meals (

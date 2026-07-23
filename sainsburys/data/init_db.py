@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS products (
     category         TEXT,
     price            REAL,
     shelf_life_days  INTEGER,
-    url              TEXT
+    url              TEXT,
+    sainsburys_uid   TEXT
 );
 
 CREATE TABLE IF NOT EXISTS meals (
@@ -122,6 +123,22 @@ CREATE VIEW weekly_totals AS
 """
 
 
+# Idempotent ALTERs for DBs created before a column existed.
+MIGRATIONS = [
+    "ALTER TABLE products ADD COLUMN sainsburys_uid TEXT",
+]
+
+
+def migrate(conn):
+    for stmt in MIGRATIONS:
+        try:
+            conn.execute(stmt)
+        except sqlite3.OperationalError as e:
+            if "duplicate column" not in str(e):
+                raise
+    conn.commit()
+
+
 def seed_products(conn):
     cur = conn.execute("SELECT COUNT(*) FROM products")
     if cur.fetchone()[0] > 0:
@@ -132,11 +149,13 @@ def seed_products(conn):
         reader = csv.DictReader(f)
         rows = [
             (row["name"], row["category"], float(row["price"]),
-             int(row["shelf_life_days"]), row.get("url") or None)
+             int(row["shelf_life_days"]), row.get("url") or None,
+             row.get("sainsburys_uid") or None)
             for row in reader
         ]
     conn.executemany(
-        "INSERT INTO products (name, category, price, shelf_life_days, url) VALUES (?,?,?,?,?)",
+        "INSERT INTO products (name, category, price, shelf_life_days, url, sainsburys_uid) "
+        "VALUES (?,?,?,?,?,?)",
         rows,
     )
     conn.commit()
@@ -161,6 +180,9 @@ def main():
             conn.execute(stmt)
     conn.commit()
     print("  views created")
+
+    migrate(conn)
+    print("  migrations applied")
 
     seed_products(conn)
     conn.close()

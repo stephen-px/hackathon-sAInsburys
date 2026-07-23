@@ -31,7 +31,7 @@ function BasketOrder({ order }) {
       {order.lines.map((l,i) => (
         <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <span style={{ fontSize:12, color:'var(--color-on-surface-subtle)' }}>
-            <span style={{ fontFamily:"'Geist Mono',monospace", color:'var(--color-on-surface)', fontWeight:600 }}>{l.qty}×</span> {l.name}
+            <span style={{ fontFamily:"'Geist Mono',monospace", color:'var(--color-on-surface)', fontWeight:600 }}>{l.qty}×</span> <ProdLink name={l.name} url={l.url} />
           </span>
           <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:12, color:'var(--color-on-surface-subtle)', marginLeft:8, flexShrink:0 }}>
             {fmt(l.qty * l.unit_price)}

@@ -30,12 +30,18 @@ def register(app):
         basket.handle_suggest_submit(body, client)
 
     @app.action("suggestion_accept")
-    def on_suggestion_accept(ack, respond, body):
+    def on_suggestion_accept(ack, respond, body, client):
         ack()
 
         def _go():
-            store.accept_selection(int(body["actions"][0]["value"]))
+            import json as _json
+            selection_id = int(body["actions"][0]["value"])
+            store.accept_selection(selection_id)
             _replace_actions(respond, body, "✅ Ordered — it'll be in this week's basket!")
+            sel = store.get_selection(selection_id)
+            if sel and sel.get("parsed"):
+                basket.push_selection_to_trolley(client, _channel_id(body),
+                                                 _json.loads(sel["parsed"]))
 
         _run(respond, _go)
 
@@ -75,6 +81,7 @@ def register(app):
                     channel=channel,
                     text="Basket ready for %s" % order["delivery_date"],
                     blocks=blk.basket_blocks(order),
+                    unfurl_links=False, unfurl_media=False,
                 )
             respond({"text": "Posted %d basket(s) for approval." % len(orders),
                      "response_type": "ephemeral", "replace_original": False})
@@ -88,7 +95,11 @@ def register(app):
         def _go():
             order_id = int(body["actions"][0]["value"])
             order = store.approve_order(order_id)
-            respond({"text": "✅ Basket for *%s* approved!" % order["delivery_date"],
+            # Trolley is already filled at /order time (push_selection_to_trolley)
+            # — approving here must not re-add the same items.
+            respond({"text": "✅ Basket for *%s* approved! Items are already in the "
+                             "<https://www.sainsburys.co.uk/gol-ui/trolley|real trolley>."
+                             % order["delivery_date"],
                      "response_type": "in_channel", "replace_original": False})
 
         _run(respond, _go)
@@ -96,12 +107,18 @@ def register(app):
     # ── Order confirmation DM buttons ────────────────────────────────────────────
 
     @app.action("order_confirm")
-    def on_order_confirm(ack, respond, body):
+    def on_order_confirm(ack, respond, body, client):
         ack()
 
         def _go():
-            store.confirm_selection(int(body["actions"][0]["value"]))
-            _replace_actions(respond, body, "✅ Confirmed — enjoy!")
+            import json as _json
+            selection_id = int(body["actions"][0]["value"])
+            store.confirm_selection(selection_id)
+            _replace_actions(respond, body, "✅ Confirmed — adding to the Sainsbury's trolley…")
+            sel = store.get_selection(selection_id)
+            if sel and sel.get("parsed"):
+                basket.push_selection_to_trolley(client, _channel_id(body),
+                                                 _json.loads(sel["parsed"]))
 
         _run(respond, _go)
 

@@ -19,7 +19,8 @@ CATALOGUE = DATA_DIR / "catalogue.csv"
 def load_catalogue():
     with open(CATALOGUE, newline="") as f:
         return [
-            (row["name"], row["category"], float(row["price"]), int(row["shelf_life_days"]))
+            (row["name"], row["category"], float(row["price"]), int(row["shelf_life_days"]),
+             row.get("url") or None, row.get("sainsburys_uid") or None)
             for row in csv.DictReader(f)
         ]
 
@@ -114,7 +115,8 @@ def seed():
             conn.executescript(SCHEMA.read_text())
 
             conn.executemany(
-                "insert into products (name, category, price, shelf_life_days) values (?, ?, ?, ?)",
+                "insert into products (name, category, price, shelf_life_days, url, sainsburys_uid) "
+                "values (?, ?, ?, ?, ?, ?)",
                 PRODUCTS,
             )
 
