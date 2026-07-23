@@ -45,8 +45,8 @@ weekly_totals() -> list
 
 | command       | handler                | description              |
 |---------------|------------------------|--------------------------|
-| /order        | handlers.order         | Open the order modal     |
-| /suggest      | handlers.suggest       | Suggest a lunch (accept/refine loop) |
+| /order        | handlers.order         | Unified flow: parse OR suggest → propose → Accept/Refine |
+| /suggest      | handlers.suggest       | Alias of /order          |
 | /demo-checkin | handlers.demo_checkin  | Send Friday check-in DMs |
 | /demo-rescue  | handlers.demo_rescue   | Post the rescue board    |
 
