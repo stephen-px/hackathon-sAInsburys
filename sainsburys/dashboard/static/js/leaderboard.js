@@ -24,7 +24,7 @@ function XPLeaderboard({ entries }) {
           </div>
         )}
         {entries.map((e, i) => {
-          const xp    = xpFromSaved(e.saved);
+          const xp    = xpFromSaved(Math.max(0, e.saved));  // net can go negative; XP floors at 0
           const level = getLevel(xp);
           const nextL = LEVELS[LEVELS.indexOf(level)+1];
           const xpPct = nextL ? ((xp - level.min) / (nextL.min - level.min)) * 100 : 100;
@@ -56,9 +56,16 @@ function XPLeaderboard({ entries }) {
                     {'🔥'.repeat(Math.min(streak, 3))}
                   </span>
                 )}
+                {(e.wasted || 0) > 0 && (
+                  <span title={`${fmt(e.wasted)} wasted`} style={{
+                    fontFamily:"'Geist Mono',monospace", fontSize:11, fontWeight:700,
+                    color:'#D64545', flexShrink:0,
+                  }}>🗑️ −{fmt(e.wasted)}</span>
+                )}
                 <span style={{
                   fontFamily:"'Geist Mono',monospace", fontSize:13, fontWeight:700, flexShrink:0,
-                  color: isTop ? 'var(--color-key-primary)' : 'var(--color-on-surface)',
+                  color: e.saved < 0 ? '#D64545'
+                       : isTop ? 'var(--color-key-primary)' : 'var(--color-on-surface)',
                 }}>{fmt(e.saved)}</span>
               </div>
 
@@ -97,6 +104,29 @@ function XPLeaderboard({ entries }) {
           );
         })}
       </div>
+
+      {/* Wall of shame — biggest wasters (net points lost to the bin) */}
+      {entries.some(e => (e.wasted || 0) > 0) && (
+        <div style={{ borderTop:'1px solid var(--color-border-subtle)', padding:'12px 18px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+            <span style={{ fontSize:13 }}>🗑️</span>
+            <span style={{ fontSize:12, fontWeight:700, color:'#D64545' }}>Biggest wasters</span>
+          </div>
+          {[...entries].filter(e => (e.wasted || 0) > 0)
+            .sort((a, b) => b.wasted - a.wasted).slice(0, 3)
+            .map((e, i) => (
+              <div key={e.slack_id} style={{
+                display:'flex', alignItems:'center', gap:8, padding:'3px 0', fontSize:12,
+              }}>
+                <span style={{ width:16, textAlign:'center' }}>{['🥇','🥈','🥉'][i]}</span>
+                <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</span>
+                <span style={{ fontFamily:"'Geist Mono',monospace", fontWeight:700, color:'#D64545' }}>
+                  −{fmt(e.wasted)}
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }

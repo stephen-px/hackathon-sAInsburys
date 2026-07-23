@@ -57,7 +57,7 @@ function BasketStatus({ basket }) {
         <div style={{ padding:'44px 18px', textAlign:'center', color:'var(--color-on-surface-subtle)' }}>
           <div style={{ fontSize:34, marginBottom:10 }}>🛒</div>
           <div style={{ fontSize:14, fontWeight:600, color:'var(--color-on-surface)' }}>No baskets yet</div>
-          <div style={{ fontSize:12, marginTop:4 }}>Run <code>/demo-aggregate</code> to build this week's baskets.</div>
+          <div style={{ fontSize:12, marginTop:4 }}>Baskets appear automatically as orders are accepted.</div>
         </div>
       ) : (
         <div style={{ display:'flex', gap:14, padding:18, flexWrap:'wrap' }}>

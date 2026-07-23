@@ -1,7 +1,6 @@
 import grocery
 import store
 from flows import basket, rescue
-from flows.basket import _current_week
 
 
 def register(app):
@@ -135,32 +134,6 @@ def register(app):
             _dm(client, user_id, "❌ %s Run /authenticate to try again."
                                  % result.get("message", "MFA verification failed."))
 
-    # ── /demo-aggregate (post the week's consolidated basket) ────────────────────
-
-    @app.command("/demo-aggregate")
-    def demo_aggregate(ack, respond, client, body):
-        ack()
-        channel = body["channel_id"]
-
-        def _go():
-            from slack_surface import blocks as blk
-            week = _current_week()
-            orders = store.build_baskets(week)
-            if not orders:
-                respond({"text": "Nothing ordered yet this week.",
-                         "response_type": "ephemeral", "replace_original": False})
-                return
-            client.chat_postMessage(
-                channel=channel,
-                text="This week's basket",
-                blocks=blk.basket_blocks(orders[0]),
-                unfurl_links=False, unfurl_media=False,
-            )
-            respond({"text": "Posted this week's basket.",
-                     "response_type": "ephemeral", "replace_original": False})
-
-        _run(respond, _go)
-
     # ── Order confirmation DM buttons ────────────────────────────────────────────
 
     @app.action("order_confirm")
@@ -203,7 +176,7 @@ def register(app):
 
         _run(respond, _go)
 
-    # ── /demo-checkin (mirrors the real Fri 09:30 trigger) ──────────────────────
+    # ── /demo-checkin (Friday: what did you eat?) ───────────────────────────────
 
     @app.command("/demo-checkin")
     def demo_checkin(ack, respond, client):
@@ -230,6 +203,35 @@ def register(app):
     def on_checkin_none(ack, respond, body, client):
         ack()
         _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.0))
+
+    # ── /reset (end-of-week sweep: waste logged & scored, orders wiped) ─────────
+
+    @app.command("/reset")
+    def reset(ack, respond, client, body):
+        ack()
+
+        def _go():
+            from slack_surface import blocks as blk
+            digest = store.sweep_waste()
+            store.wipe_orders()
+            print("[reset] wasted £%.2f across %d items; orders wiped"
+                  % (digest["wasted_value"], digest["wasted_items"]), flush=True)
+            client.chat_postMessage(
+                channel=body["channel_id"],
+                text="🗑️ Weekly sweep: £%.2f wasted. Fresh week started." % digest["wasted_value"],
+                blocks=blk.digest_blocks(digest),
+            )
+            board = store.leaderboard()
+            if board:
+                lb_text = "\n".join(
+                    "%s. *%s* — £%.2f net (£%.2f saved / £%.2f wasted)" % (
+                        i + 1, row["name"], row["net"], row["claimed"], row["wasted"])
+                    for i, row in enumerate(board[:5])
+                )
+                client.chat_postMessage(channel=body["channel_id"],
+                                        text="🏆 *Leaderboard:*\n" + lb_text)
+
+        _run(respond, _go)
 
     # ── /demo-rescue (mirrors the real Fri 11:30 trigger) ───────────────────────
 
@@ -271,36 +273,6 @@ def register(app):
             )
 
         _run(respond, _claim)
-
-    # ── /demo-sweep (end-of-week waste sweep + digest) ────────────────────────────
-
-    @app.command("/demo-sweep")
-    def demo_sweep(ack, respond, client, body):
-        ack()
-        channel = body["channel_id"]
-
-        def _go():
-            from slack_surface import blocks as blk
-            week = _current_week()
-            digest = store.sweep_waste(week)
-            client.chat_postMessage(
-                channel=channel,
-                text="🗑️ Weekly waste sweep",
-                blocks=blk.digest_blocks(digest),
-            )
-            board = store.leaderboard()
-            if board:
-                lb_text = "\n".join(
-                    "%s. *%s* — £%.2f saved" % (i + 1, row["name"], row["saved"])
-                    for i, row in enumerate(board[:5])
-                )
-                client.chat_postMessage(channel=channel,
-                                        text="🏆 *Rescue leaderboard:*\n" + lb_text)
-            respond({"text": "Sweep done.",
-                     "response_type": "ephemeral", "replace_original": False})
-
-        _run(respond, _go)
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -368,7 +340,7 @@ def _record_checkin(respond, body, client, fraction):
             channel=_channel_id(body),
             thread_ts=body["message"]["ts"],
             text="🧾 All done! You ate *£%.2f* of your *£%.2f* order this week. "
-                 "Whatever's left goes on the rescue board 🛟" % (
+                 "Whatever's left stays on the rescue board 🛟" % (
                 summary["eaten_value"], summary["ordered_value"]),
         )
 
