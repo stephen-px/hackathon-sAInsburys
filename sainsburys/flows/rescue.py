@@ -13,7 +13,12 @@ def send_checkin_dms(client):
         items = store.open_items_for(user, week)
         if not items:
             continue
-        dm = client.conversations_open(users=user)
+        try:
+            dm = client.conversations_open(users=user)
+        except Exception as e:
+            # Seeded/demo users aren't real Slack ids — skip, don't kill the run
+            print("checkin: can't DM %s (%s) — skipping" % (user, e))
+            continue
         client.chat_postMessage(channel=dm["channel"]["id"],
                                 text="Friday check-in — how did you get on?",
                                 blocks=blocks.checkin_blocks(items),
