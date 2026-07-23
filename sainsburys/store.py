@@ -57,9 +57,23 @@ def _q(sql, params=(), fetch=None):
 def ensure_user(slack_id, name):
     _q(
         "insert into users (slack_id, name) values (?, ?) "
-        "on conflict (slack_id) do update set name = excluded.name",
+        "on conflict (slack_id) do update set name = coalesce(excluded.name, name)",
         (slack_id, name),
     )
+
+
+def slack_ids_missing_names():
+    """Slack IDs seen in events/selections with no name in `users` —
+    the dashboard shows these as raw U… IDs until backfilled."""
+    rows = _q(
+        "select distinct s.user_slack_id from ("
+        " select user_slack_id from events"
+        " union select user_slack_id from selections) s"
+        " left join users u on u.slack_id = s.user_slack_id"
+        " where s.user_slack_id is not null and u.name is null",
+        fetch="all",
+    ) or []
+    return [r["user_slack_id"] for r in rows]
 
 
 # ── Selections ────────────────────────────────────────────────────────────────

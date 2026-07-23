@@ -56,6 +56,10 @@ def main():
     _start_auth_server()
     app = App(token=os.environ["SLACK_BOT_TOKEN"])
     handlers.register(app)
+    # Heal historical events recorded before names were captured — the
+    # dashboard shows raw U… IDs for anyone missing from `users`.
+    import identity
+    identity.backfill_missing_names(app.client)
     print("⚡ sAInsburys connecting via Socket Mode…")
     SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()
 

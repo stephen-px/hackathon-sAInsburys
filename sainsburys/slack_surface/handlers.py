@@ -1,4 +1,5 @@
 import grocery
+import identity
 import store
 from flows import basket, rescue
 
@@ -254,6 +255,8 @@ def register(app):
                                  "Run `/demo-rescue` for the latest board.",
                          "response_type": "ephemeral", "replace_original": False})
                 return
+            identity.ensure_user_name(client, user,
+                                      fallback=body["user"].get("username"))
             total = store.claimed_total()
             client.chat_postMessage(
                 channel=_channel_id(body),
@@ -329,6 +332,7 @@ def _record_checkin(respond, body, client, fraction):
                  "response_type": "ephemeral", "replace_original": False})
         return
 
+    identity.ensure_user_name(client, user, fallback=body["user"].get("username"))
     label = {1.0: "✅ Ate it", 0.5: "🥡 Some left", 0.0: "🙈 Didn't touch"}[fraction]
     new_blocks = _replace_actions(respond, body, "%s — *%s*" % (label, result["name"]), value=raw)
 

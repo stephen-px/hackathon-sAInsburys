@@ -1,6 +1,7 @@
 import json
 
 import grocery
+import identity
 import store
 from agents import concierge
 from datetime import date, timedelta
@@ -58,14 +59,14 @@ def handle_order_submit(body, client):
     Order it / Change something.
     """
     user_id = body["user"]["id"]
-    user_name = body["user"].get("username", body["user"].get("name", user_id))
+    user_name = body["user"].get("username") or body["user"].get("name")
     values = body["view"]["state"]["values"]
     order_text = (values["order_text"]["text"].get("value") or "").strip()
     # Delivery halves were dropped from the UX — everything is one weekly basket.
     half = "early"
     week = _current_week()
 
-    store.ensure_user(user_id, user_name)
+    identity.ensure_user_name(client, user_id, fallback=user_name)
 
     dm = client.conversations_open(users=user_id)
     dm_channel = dm["channel"]["id"]
