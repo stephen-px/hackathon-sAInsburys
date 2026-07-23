@@ -14,50 +14,20 @@ function ExpiryBadge({ days }) {
   return pill('var(--color-border-subtle)', 'var(--color-on-surface-subtle)', `${days} days`);
 }
 
-function ClaimBtn({ item, onClaim }) {
-  const [h, setH]   = useState(false);
-  const [rip, setR] = useState(false);
-  const ref         = useRef(null);
-  function click(e) {
-    try {
-      setR(true); setTimeout(()=>setR(false), 600);
-      const r = ref.current ? ref.current.getBoundingClientRect() : { left:e.clientX, top:e.clientY, width:0, height:0 };
-      boom(r.left + r.width/2, r.top + r.height/2);
-      onClaim(item);
-    } catch(err) { console.error('[ClaimBtn]',err.message); }
-  }
+function ClaimedVia() {
   return (
-    <button ref={ref} onClick={click}
-      onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
-      style={{
-        position:'relative', overflow:'hidden',
-        display:'inline-flex', alignItems:'center', gap:5,
-        padding:'0 13px', height:28,
-        background: h ? 'rgba(5,168,49,0.22)' : 'rgba(5,168,49,0.1)',
-        border:'none',
-        boxShadow:'0 0 0 1.5px var(--color-key-success)',
-        borderRadius:6,
-        color:'var(--color-key-success)',
-        cursor:'pointer', fontSize:12, fontWeight:700,
-        fontFamily:"'Geist', sans-serif",
-        transition:'background 0.15s',
-      }}
-    >
-      {rip && <span style={{
-        position:'absolute', top:'50%', left:'50%',
-        width:36, height:36, marginTop:-18, marginLeft:-18,
-        borderRadius:'50%',
-        background:'rgba(5,168,49,0.4)',
-        animation:'ripple 0.6s ease forwards',
-        pointerEvents:'none',
-      }}/>}
-      <Icon name="volunteer_activism" size={13} color="var(--color-key-success)" />
-      Claim
-    </button>
+    <span style={{
+      display:'inline-flex', alignItems:'center', gap:5,
+      fontSize:11, fontWeight:600,
+      color:'var(--color-on-surface-subtle)', whiteSpace:'nowrap',
+    }}>
+      <Icon name="bolt" size={13} color="var(--color-on-surface-subtle)" />
+      Claim in Slack
+    </span>
   );
 }
 
-function RescueBoard({ items, onClaim }) {
+function RescueBoard({ items }) {
   return (
     <div style={{ ...card({ padding:0, overflow:'hidden', flex:1, minWidth:0 }) }}>
       <div style={{
@@ -81,7 +51,7 @@ function RescueBoard({ items, onClaim }) {
         <table style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
             <tr style={{ borderBottom:'1px solid var(--color-border-subtle)', background:'var(--color-container-surface-low)' }}>
-              {['Item','Expires','Qty','Value at risk',''].map((h,i) => (
+              {['Item','Expires','Qty','Value at risk','Status'].map((h,i) => (
                 <th key={i} style={{
                   padding:'8px 16px',
                   textAlign: i>=2 && i<4 ? 'right' : 'left',
@@ -115,7 +85,7 @@ function RescueBoard({ items, onClaim }) {
                     {fmt(item.qty_remaining * item.price)}
                   </td>
                   <td style={{ padding:'11px 16px' }}>
-                    <ClaimBtn item={item} onClaim={onClaim} />
+                    <ClaimedVia />
                   </td>
                 </tr>
               );

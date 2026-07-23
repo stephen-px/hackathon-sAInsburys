@@ -3,7 +3,7 @@ import os
 import sys
 import time
 
-from flask import Flask, Response, jsonify, request, send_file, stream_with_context
+from flask import Flask, Response, jsonify, send_file, stream_with_context
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -275,37 +275,6 @@ def totals():
         return jsonify(rows)
     except Exception:
         return jsonify(MOCK_TOTALS if ALLOW_MOCK else [])
-
-
-# ── Claim (one-tap rescue from the dashboard) ────────────────────────────────
-
-@app.route("/api/claim", methods=["POST"])
-def claim():
-    """Rescue a leftover from the dashboard. Claims the whole remaining lot in a
-    single event so the row clears from the board. Returns the £ value rescued.
-
-    Body: {product_id, user?, qty?}. Falls back to an optimistic echo when the
-    DB is unavailable (mock mode) so the UI still behaves on stage."""
-    body = request.get_json(silent=True) or {}
-    product_id = body.get("product_id")
-    user = body.get("user") or "U-dashboard"
-    if product_id is None:
-        return jsonify({"ok": False, "error": "product_id required"}), 400
-    # Big qty → store clamps to whatever is actually left (whole lot, one event).
-    qty = body.get("qty", 9999)
-    try:
-        import store
-        res = store.claim_product(int(product_id), user, qty=qty)
-        return jsonify({"ok": True, "product_id": product_id, "name": res["name"],
-                        "value": res["value"], "qty_left": res["qty_left"]})
-    except ValueError:
-        # Already gone (someone else claimed it) — a no-op success; the board
-        # will reconcile on the next poll.
-        return jsonify({"ok": True, "product_id": product_id, "value": 0, "qty_left": 0})
-    except Exception:
-        # DB unavailable — echo an optimistic success so mock mode keeps working.
-        return jsonify({"ok": True, "product_id": product_id,
-                        "value": body.get("value", 0), "qty_left": 0})
 
 
 # ── SSE endpoint — live event stream ─────────────────────────────────────────

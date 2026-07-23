@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS events (
     ts            DATETIME DEFAULT CURRENT_TIMESTAMP,
     kind          TEXT CHECK(kind IN ('consumed','claimed','wasted')),
     user_slack_id TEXT,
-    lot_id        INTEGER REFERENCES inventory_lots(id),
+    product_id    INTEGER REFERENCES products(id),
     qty           REAL,
     value         REAL
 );

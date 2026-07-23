@@ -26,13 +26,6 @@ function App() {
   const [feed,   setFeed]   = useState([]);
   const [demo,   setDemo]   = useState(false);   // true = showing mock/demo data
   const uid = useRef(0);
-  // product ids the user has claimed from the dashboard — suppressed from the
-  // board until the server confirms (so mock mode never resurrects them, and
-  // real mode clears the suppression once /api/rescue drops the row).
-  const removedRef = useRef(new Set());
-  // £ values of our own claims we expect to see echoed back over SSE — each
-  // is swallowed once so a dashboard claim isn't double-counted.
-  const echoRef = useRef([]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
@@ -86,12 +79,7 @@ function App() {
         ]);
         setApiOk(true);
         setDemo(false);   // real API responded — not the client mock fallback
-        // Reconcile optimistic claims: once the server stops listing a
-        // claimed item, drop its suppression (so a /demo-reset can re-add it).
-        const serverIds = new Set(rescue.map(it => it.id));
-        removedRef.current.forEach(id => { if (!serverIds.has(id)) removedRef.current.delete(id); });
-        const mergedRescue = rescue.filter(it => !removedRef.current.has(it.id));
-        setData(d => ({ ...d, stats, leaderboard, rescue: mergedRescue, basket, totals, departments }));
+        setData(d => ({ ...d, stats, leaderboard, rescue, basket, totals, departments }));
       } catch(_) {
         // API server unreachable — fall back to demo data so the UI isn't blank
         if (!apiOk) { setData(MOCK); setDemo(true); }
@@ -113,10 +101,8 @@ function App() {
         try {
           const ev = JSON.parse(e.data);
           if (ev.kind==='claimed' && ev.value>0) {
-            // swallow the echo of a claim we already applied optimistically
-            const v = Math.round(ev.value*100)/100;
-            const i = echoRef.current.findIndex(x => Math.abs(x-v) < 0.01);
-            if (i !== -1) { echoRef.current.splice(i,1); return; }
+            // a claim landed (from Slack) — celebrate on the dashboard
+            boom(null, null);
             handleClaim(ev.value, ev.item||'an item', ev.user||'Someone');
           }
         } catch(err) { console.error('[SSE]',err.message); }
@@ -136,28 +122,6 @@ function App() {
 
   const expFloat = useCallback(id => setFloats(f => f.filter(x=>x.id!==id)), []);
   const expToast = useCallback(id => setToasts(t => t.filter(x=>x.id!==id)), []);
-
-  /* Claim from the dashboard: remove the row instantly, tick the counter,
-     and persist to the backend (which logs a 'claimed' event → leaderboard,
-     £-saved, and the item drops out of /api/rescue on the next poll). */
-  const onRescue = useCallback(item => {
-    try {
-      const qty   = item.qty_remaining || 1;
-      const value = Math.round(qty * item.price * 100) / 100;
-      // optimistic: pull the row off the board immediately
-      removedRef.current.add(item.id);
-      setData(d => ({ ...d, rescue: d.rescue.filter(r => r.id !== item.id) }));
-      // expect (and later swallow) the SSE echo of this claim
-      echoRef.current.push(value);
-      handleClaim(value, item.name, 'You');
-      // persist — claim the whole remaining lot in one event
-      fetch('/api/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: item.id, qty, value, user: 'U-dashboard' }),
-      }).catch(() => {});
-    } catch(e) { console.error('[onRescue]', e.message); }
-  }, [handleClaim]);
 
   // Data-source state: 'demo' = fabricated mock data; 'empty' = server up but no
   // live DB seeded; otherwise real DB data (no banner).
@@ -215,7 +179,7 @@ function App() {
             <FridgeHP rescue={data.rescue}/>
 
             <div style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
-              <RescueBoard items={data.rescue} onClaim={onRescue}/>
+              <RescueBoard items={data.rescue}/>
               <ActivityFeed events={feed}/>
             </div>
           </>
