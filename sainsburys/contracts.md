@@ -27,9 +27,10 @@ users_with_selections(week) -> list[slack_id]
 open_items_for(user, week) -> list[{product_id, name, qty}]
 record_consumption(user, product_id, fraction) -> {product_id, name, qty, value}
 
-# Basket aggregation (implemented — future /demo-aggregate)
-build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price, url}]
-approve_order(order_id) -> Order
+# Basket aggregation (implemented — /demo-aggregate)
+# ONE consolidated weekly basket (no delivery halves, no approval step —
+# items are already in the real trolley from the Slack confirm tap).
+build_baskets(week) -> list[Order]        # [order] or []; order has "lines" [{product_id, name, qty, unit_price, url}]
 order_lines(order_id) -> list[{product_id, name, qty, unit_price, sainsburys_uid, url}]
 
 # Real Sainsbury's mapping (products.sainsburys_uid / products.url)
@@ -88,8 +89,8 @@ grocery.is_connected() -> bool
 grocery.push_lines(lines) -> {added, failed, resolved, total, trolley_url}
 
 # Orchestration (flows/basket.py):
-push_to_trolley(order_id) -> result      # called on Approve; caches resolved uids
-trolley_summary_text(result) -> str      # Slack mrkdwn summary
+push_selection_to_trolley(client, dm_channel, parsed) -> None  # on "Order it ✅" tap
+trolley_summary_text(result) -> str      # Slack mrkdwn summary (always links trolley)
 
 # Product identity cache: data/backfill_sainsburys.py maps all catalogue
 # products to real uids/urls (anonymous search) and writes them back into

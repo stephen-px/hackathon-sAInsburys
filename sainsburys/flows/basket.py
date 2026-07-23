@@ -201,19 +201,6 @@ def prefilled_order_modal(selection_id):
 
 # ── Real Sainsbury's trolley push (add-to-basket only, never checkout) ─────────
 
-def push_to_trolley(order_id):
-    """Add an approved order's lines to the real sainsburys.co.uk trolley.
-
-    Newly resolved product uids/urls are cached back onto products so the
-    next push (and product links) skip the search round-trip.
-    Returns grocery.push_lines()'s result dict."""
-    lines = store.order_lines(order_id)
-    result = grocery.push_lines(lines)
-    for product_id, (uid, url) in result["resolved"].items():
-        store.set_product_sainsburys(product_id, uid, url)
-    return result
-
-
 def push_selection_to_trolley(client, dm_channel, result):
     """Add one parsed selection's lines to the real trolley, DM the outcome.
 

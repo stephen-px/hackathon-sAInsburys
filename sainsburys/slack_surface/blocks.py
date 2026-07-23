@@ -18,24 +18,21 @@ def plink(name, url=None):
 
 def meal_picker_blocks(suggestions): raise NotImplementedError
 def basket_blocks(order):
-    """Block Kit message for one draft basket order with an Approve button."""
+    """Block Kit message for the week's single consolidated basket."""
     lines = order.get("lines", [])
     total = sum(l["qty"] * l["unit_price"] for l in lines)
-    delivery = order["delivery_date"]
     items_text = "\n".join(
         "• %gx *%s* — £%.2f" % (l["qty"], plink(l["name"], l.get("url")),
                                 l["qty"] * l["unit_price"])
         for l in lines
     ) or "_No items_"
     return [
-        {"type": "header", "text": {"type": "plain_text", "text": "🛒 Basket — %s" % delivery}},
+        {"type": "header", "text": {"type": "plain_text",
+            "text": "🛒 This week's basket — w/c %s" % order["week"]}},
         {"type": "section", "text": {"type": "mrkdwn", "text": items_text}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": "*Total: £%.2f*" % total}]},
-        {"type": "actions", "elements": [
-            {"type": "button", "style": "primary",
-             "text": {"type": "plain_text", "text": "✅ Approve order"},
-             "action_id": "approve_order", "value": str(order["id"])},
-        ]},
+        {"type": "context", "elements": [{"type": "mrkdwn",
+            "text": "*Total: £%.2f* · everything confirmed in Slack is already in the "
+                    "<https://www.sainsburys.co.uk/gol-ui/trolley|real trolley>" % total}]},
     ]
 
 

@@ -63,7 +63,7 @@ def register(app):
         ack()
         basket.handle_refine_submit(body, client)
 
-    # ── /demo-aggregate (build baskets + post Approve buttons) ──────────────────
+    # ── /demo-aggregate (post the week's consolidated basket) ────────────────────
 
     @app.command("/demo-aggregate")
     def demo_aggregate(ack, respond, client, body):
@@ -75,34 +75,17 @@ def register(app):
             week = _current_week()
             orders = store.build_baskets(week)
             if not orders:
-                respond({"text": "No pending selections to aggregate this week.",
+                respond({"text": "Nothing ordered yet this week.",
                          "response_type": "ephemeral", "replace_original": False})
                 return
-            for order in orders:
-                client.chat_postMessage(
-                    channel=channel,
-                    text="Basket ready for %s" % order["delivery_date"],
-                    blocks=blk.basket_blocks(order),
-                    unfurl_links=False, unfurl_media=False,
-                )
-            respond({"text": "Posted %d basket(s) for approval." % len(orders),
+            client.chat_postMessage(
+                channel=channel,
+                text="This week's basket",
+                blocks=blk.basket_blocks(orders[0]),
+                unfurl_links=False, unfurl_media=False,
+            )
+            respond({"text": "Posted this week's basket.",
                      "response_type": "ephemeral", "replace_original": False})
-
-        _run(respond, _go)
-
-    @app.action("approve_order")
-    def on_approve_order(ack, respond, body):
-        ack()
-
-        def _go():
-            order_id = int(body["actions"][0]["value"])
-            order = store.approve_order(order_id)
-            # Trolley is already filled at /order time (push_selection_to_trolley)
-            # — approving here must not re-add the same items.
-            respond({"text": "✅ Basket for *%s* approved! Items are already in the "
-                             "<https://www.sainsburys.co.uk/gol-ui/trolley|real trolley>."
-                             % order["delivery_date"],
-                     "response_type": "in_channel", "replace_original": False})
 
         _run(respond, _go)
 

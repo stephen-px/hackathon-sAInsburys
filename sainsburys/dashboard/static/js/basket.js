@@ -1,12 +1,11 @@
-/* basket.js — the Order Basket tab: the two weekly baskets + the weekly chart. */
+/* basket.js — the Order Basket tab: the single weekly basket + the weekly chart. */
 
 const STATUS_CFG = {
-  draft:     { bg:'var(--color-border-subtle)',   fg:'var(--color-on-surface-subtle)', label:'Draft',     icon:'edit' },
-  approved:  { bg:'rgba(5,168,49,0.18)',          fg:'var(--color-key-success)',       label:'Approved',  icon:'check_circle' },
-  delivered: { bg:'rgba(87,140,255,0.18)',        fg:'var(--color-key-primary)',       label:'Delivered', icon:'local_shipping' },
+  open:      { bg:'rgba(5,168,49,0.18)',          fg:'var(--color-key-success)',       label:'In trolley', icon:'shopping_cart' },
+  delivered: { bg:'rgba(87,140,255,0.18)',        fg:'var(--color-key-primary)',       label:'Delivered',  icon:'local_shipping' },
 };
 function StatusBadge({ s }) {
-  const c = STATUS_CFG[s] || STATUS_CFG.draft;
+  const c = STATUS_CFG[s] || STATUS_CFG.open;
   return (
     <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'0 9px', height:24, borderRadius:99, background:c.bg, color:c.fg, fontSize:11, fontWeight:700 }}>
       <Icon name={c.icon} size={12} color={c.fg} />{c.label}
@@ -15,10 +14,10 @@ function StatusBadge({ s }) {
 }
 function BasketOrder({ order }) {
   const date = (() => {
-    try { return new Date(order.delivery_date).toLocaleDateString('en-GB', { weekday:'short', month:'short', day:'numeric' }); }
+    try { return 'w/c ' + new Date(order.delivery_date).toLocaleDateString('en-GB', { month:'short', day:'numeric' }); }
     catch { return order.delivery_date; }
   })();
-  const accent = order.status==='approved' ? 'var(--color-key-success)' : order.status==='delivered' ? 'var(--color-key-primary)' : 'var(--color-border-subtle)';
+  const accent = order.status==='delivered' ? 'var(--color-key-primary)' : 'var(--color-key-success)';
   return (
     <div style={{ flex:1, background:'var(--color-container-surface-low)', borderRadius:8, padding:16, border:'1px solid var(--color-border-subtle)', borderTop:`2px solid ${accent}` }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>

@@ -97,16 +97,10 @@ function getLevel(xp) { return LEVELS.find(l => xp >= l.min && xp <= l.max) || L
 function xpFromSaved(saved) { return Math.round(saved * 10); }
 
 /* ── Mock data (fallback only — used when the API server is unreachable) ── */
-const MOCK_NAMES = ['Alice Chen','Bob Smith','Carol Jones','Dave Kumar','Eve Williams','Frank Lee','Grace Park'];
+/* No fabricated people: the leaderboard only ever shows real users. */
 const MOCK = {
   stats: { saved_week: 47.30, items_rescued: 12, pending_orders: 1, active_claimers: 7 },
-  leaderboard: [
-    { slack_id: 'U001', name: 'Alice Chen',   saved: 18.50, streak: 4 },
-    { slack_id: 'U002', name: 'Bob Smith',    saved: 12.30, streak: 2 },
-    { slack_id: 'U003', name: 'Carol Jones',  saved:  9.80, streak: 3 },
-    { slack_id: 'U004', name: 'Dave Kumar',   saved:  4.20, streak: 1 },
-    { slack_id: 'U005', name: 'Eve Williams', saved:  2.50, streak: 1 },
-  ],
+  leaderboard: [],
   rescue: [
     { id: 1, name: 'Hummus & Flatbreads',  days_left: 0, qty_remaining: 2, price: 2.50, risk_score: 6.2 },
     { id: 2, name: 'Mixed Leaf Salad',     days_left: 1, qty_remaining: 3, price: 1.80, risk_score: 4.1 },
@@ -118,17 +112,11 @@ const MOCK = {
   basket: {
     week: '2026-07-20',
     orders: [
-      { id: 1, delivery_date: '2026-07-21', status: 'approved', total: 87.40,
+      { id: 1, delivery_date: '2026-07-20', status: 'open', total: 87.40,
         lines: [
           { name: 'Chicken Caesar Wrap', qty: 8, unit_price: 3.50 },
           { name: 'Hummus & Flatbreads', qty: 6, unit_price: 2.50 },
           { name: 'Mixed Leaf Salad',    qty: 5, unit_price: 1.80 },
-        ] },
-      { id: 2, delivery_date: '2026-07-23', status: 'draft', total: 62.20,
-        lines: [
-          { name: 'Falafel Bowl',              qty: 6, unit_price: 4.50 },
-          { name: 'Fruit Pot',                 qty: 8, unit_price: 2.00 },
-          { name: 'Cheese & Chutney Baguette', qty: 5, unit_price: 3.20 },
         ] },
     ],
   },

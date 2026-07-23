@@ -1,10 +1,6 @@
 /* app.js — top-level App: data polling, live claim stream, and tab routing.
    Loaded last: depends on everything defined in the other js files. */
 
-const SIM_ITEMS  = ['Hummus & Flatbreads','Falafel Bowl','Fruit Pot','Mixed Leaf Salad','Chicken Caesar Wrap'];
-const SIM_PRICES = [2.50, 4.50, 2.00, 1.80, 3.50];
-let simIdx = 0;
-
 const EMPTY = {
   stats:       { saved_week: 0, items_rescued: 0, pending_orders: 0, active_claimers: 0 },
   leaderboard: [],
@@ -111,15 +107,6 @@ function App() {
     return () => { try { es && es.close(); } catch(_) {} };
   }, [handleClaim]);
 
-  const onSim = useCallback(() => {
-    try {
-      const i = simIdx % SIM_ITEMS.length;
-      simIdx++;
-      boom(null, null);
-      handleClaim(SIM_PRICES[i], SIM_ITEMS[i], MOCK_NAMES[simIdx % MOCK_NAMES.length]);
-    } catch(e) { console.error('[onSim]',e.message); }
-  }, [handleClaim]);
-
   const expFloat = useCallback(id => setFloats(f => f.filter(x=>x.id!==id)), []);
   const expToast = useCallback(id => setToasts(t => t.filter(x=>x.id!==id)), []);
 
@@ -130,7 +117,7 @@ function App() {
 
   return (
     <div>
-      <Header theme={theme} onToggle={()=>setTheme(t=>t==='dark'?'light':'dark')} live={live} onSim={onSim}/>
+      <Header theme={theme} onToggle={()=>setTheme(t=>t==='dark'?'light':'dark')} live={live}/>
       <TabBar
         active={tab}
         onSelect={setTab}
@@ -172,7 +159,7 @@ function App() {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
               <StatTile icon="savings"       value={fmt(data.stats.saved_week)} label="Saved this week"   accent="var(--color-key-success)" sub="vs £89 same time last week" />
               <StatTile icon="recycling"     value={data.stats.items_rescued}   label="Items rescued"     accent="#70D913" />
-              <StatTile icon="shopping_cart" value={data.stats.pending_orders}  label="Awaiting approval" accent="var(--color-key-warning)" />
+              <StatTile icon="shopping_cart" value={data.stats.pending_orders}  label="Open baskets" accent="var(--color-key-warning)" />
               <StatTile icon="group"         value={data.stats.active_claimers} label="Active heroes"     accent="var(--color-key-primary)" />
             </div>
 
@@ -189,8 +176,8 @@ function App() {
         {tab === 'basket' && (
           <>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
-              <StatTile icon="shopping_cart"  value={(data.basket.orders||[]).length} label="Baskets this week" accent="var(--color-key-primary)" />
-              <StatTile icon="pending_actions" value={data.stats.pending_orders}      label="Awaiting approval" accent="var(--color-key-warning)" />
+              <StatTile icon="shopping_cart"  value={(data.basket.orders||[]).length} label="Basket this week" accent="var(--color-key-primary)" />
+              <StatTile icon="group"           value={data.stats.active_claimers}     label="Active heroes" accent="var(--color-key-warning)" />
               <StatTile icon="payments"        value={fmt((data.basket.orders||[]).reduce((s,o)=>s+(o.total||0),0))} label="Total basket value" accent="#70D913" />
             </div>
             <BasketStatus basket={data.basket}/>

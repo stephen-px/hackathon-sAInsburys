@@ -40,7 +40,7 @@ def _load_session():
 
 def _client(require_session=True):
     """HTTP client. Search works anonymously; basket writes need the real
-    account session so the trolley shows up in the approver's browser.
+    account session so the trolley shows up in the user's browser.
 
     GROCERY_ANON=1 forces anonymous requests even when a session exists —
     bulk jobs (the catalogue backfill) must never run on the real account."""

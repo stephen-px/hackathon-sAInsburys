@@ -23,8 +23,7 @@ function Toast({ t, onClose }) {
 }
 
 /* ── Header ─────────────────────────────────────────────────────────── */
-function Header({ theme, onToggle, live, onSim }) {
-  const [h, setH] = useState(false);
+function Header({ theme, onToggle, live }) {
   return (
     <header style={{
       height: 54,
@@ -49,28 +48,6 @@ function Header({ theme, onToggle, live, onSim }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button
-          onClick={onSim}
-          onMouseEnter={()=>setH(true)}
-          onMouseLeave={()=>setH(false)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            padding: '0 16px', height: 34,
-            background: h ? 'rgba(87,140,255,0.22)' : 'rgba(87,140,255,0.1)',
-            border: 'none',
-            boxShadow: '0 0 0 1.5px var(--color-key-primary)',
-            borderRadius: 6,
-            color: 'var(--color-key-primary)',
-            cursor: 'pointer', fontSize: 12, fontWeight: 700,
-            fontFamily: "'Geist', sans-serif",
-            transition: 'background 0.15s, box-shadow 0.15s',
-            letterSpacing: '0.02em',
-          }}
-        >
-          <Icon name="bolt" size={15} color="var(--color-key-primary)" />
-          Simulate Claim
-        </button>
-
         {live && (
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
             <div style={{

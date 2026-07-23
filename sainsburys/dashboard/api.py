@@ -15,13 +15,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 MOCK_STATS = {"saved_week": 47.30, "items_rescued": 12, "pending_orders": 1, "active_claimers": 7}
 
-MOCK_LEADERBOARD = [
-    {"slack_id": "U001", "name": "Alice Chen",   "saved": 18.50},
-    {"slack_id": "U002", "name": "Bob Smith",    "saved": 12.30},
-    {"slack_id": "U003", "name": "Carol Jones",  "saved":  9.80},
-    {"slack_id": "U004", "name": "Dave Kumar",   "saved":  4.20},
-    {"slack_id": "U005", "name": "Eve Williams", "saved":  2.50},
-]
+# No fabricated people: the leaderboard only ever shows real users.
+MOCK_LEADERBOARD = []
 
 MOCK_RESCUE = [
     {"id": 1, "name": "Hummus & Flatbreads",    "days_left": 0, "qty_remaining": 2, "price": 2.50, "risk_score": 6.2},
@@ -36,19 +31,11 @@ MOCK_BASKET = {
     "week": "2026-07-20",
     "orders": [
         {
-            "id": 1, "delivery_date": "2026-07-21", "status": "approved", "total": 87.40,
+            "id": 1, "delivery_date": "2026-07-20", "status": "open", "total": 87.40,
             "lines": [
                 {"name": "Chicken Caesar Wrap", "qty": 8, "unit_price": 3.50},
                 {"name": "Hummus & Flatbreads", "qty": 6, "unit_price": 2.50},
                 {"name": "Mixed Leaf Salad",    "qty": 5, "unit_price": 1.80},
-            ],
-        },
-        {
-            "id": 2, "delivery_date": "2026-07-23", "status": "draft", "total": 62.20,
-            "lines": [
-                {"name": "Falafel Bowl",              "qty": 6, "unit_price": 4.50},
-                {"name": "Fruit Pot",                 "qty": 8, "unit_price": 2.00},
-                {"name": "Cheese & Chutney Baguette", "qty": 5, "unit_price": 3.20},
             ],
         },
     ],
@@ -137,7 +124,7 @@ def stats():
               AND ts >= datetime('now', 'weekday 1', '-7 days')
         """)
         rescued = int(cur.fetchone()[0])
-        cur.execute("SELECT COUNT(*) FROM orders WHERE status = 'draft'")
+        cur.execute("SELECT COUNT(*) FROM orders WHERE status = 'open'")
         pending = int(cur.fetchone()[0])
         cur.execute("""
             SELECT COUNT(DISTINCT user_slack_id) FROM events

@@ -1,7 +1,7 @@
 """
 Map every catalogue product to its live sainsburys.co.uk identity
 (product_uid + product page URL) via the search API, cached onto products.
-Makes Approve-time trolley pushes instant and product links real.
+Makes confirm-time trolley pushes instant and product links real.
 
 No login needed — the search API answers anonymously.
 Idempotent — only touches products with no sainsburys_uid yet.

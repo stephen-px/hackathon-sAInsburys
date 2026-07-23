@@ -186,16 +186,16 @@ def get_products_by_ids(ids):
 
 # ── Orders / baskets ──────────────────────────────────────────────────────────
 
-def _selection_lines(week, half, conn):
-    """Aggregate qty per product across the week's selections for one half.
+def _selection_lines(week, conn):
+    """Aggregate qty per product across ALL the week's placed selections.
 
     Reads on the caller's connection so it never opens a nested handle inside
     an in-flight write transaction (that self-deadlocks SQLite).
     """
     selections = conn.execute(
         "select meal_id, parsed from selections "
-        "where week = ? and half = ? and status in ('pending', 'confirmed')",
-        (str(week), half),
+        "where week = ? and status in ('pending', 'confirmed', 'ordered')",
+        (str(week),),
     ).fetchall()
     qty_by_product = {}
     for sel in selections:
@@ -216,73 +216,48 @@ def _selection_lines(week, half, conn):
 
 def build_baskets(week):
     """
-    Deterministic aggregation: this week's selections → two draft orders
-    (early → Monday delivery, late → Wednesday). Only replaces a half's
-    existing draft if there are actual selections for it — so demo-seeded
-    orders are never silently deleted by a half-empty order run.
-    Returns the orders that were created or already existed.
+    Deterministic aggregation: ALL of this week's placed selections → ONE
+    weekly basket order (full rebuild each run, so re-running is idempotent).
+    Returns [order] with lines, or [] when nothing has been ordered yet.
     """
-    from datetime import date, timedelta
+    from datetime import date
     monday = date.fromisoformat(str(week))
-    orders = []
     with _tx() as conn:
-        for half, delivery in (("early", monday), ("late", monday + timedelta(days=2))):
-            qty_by_product = _selection_lines(week, half, conn)
-            if not qty_by_product:
-                # No new selections for this half — leave any existing draft alone
-                existing = conn.execute(
-                    "select id, week, delivery_date, status from orders "
-                    "where week = ? and delivery_date = ? and status = 'draft'",
-                    (str(week), str(delivery)),
-                ).fetchone()
-                if existing:
-                    lines = conn.execute(
-                        "select p.name, ol.qty, ol.unit_price, p.url "
-                        "from order_lines ol join products p on p.id = ol.product_id "
-                        "where ol.order_id = ?", (existing["id"],)
-                    ).fetchall()
-                    orders.append({
-                        "id": existing["id"], "week": str(week),
-                        "delivery_date": str(delivery), "status": "draft",
-                        "lines": [dict(l) for l in lines],
-                    })
-                continue
+        qty_by_product = _selection_lines(week, conn)
+        # Full rebuild: drop this week's existing basket(s) and recompute
+        stale = conn.execute(
+            "select id from orders where week = ?", (str(week),)
+        ).fetchall()
+        for row in stale:
+            conn.execute("delete from order_lines where order_id = ?", (row["id"],))
+            conn.execute("delete from orders where id = ?", (row["id"],))
+        if not qty_by_product:
+            return []
 
-            # We have selections — delete the stale draft for this half and rebuild
-            stale = conn.execute(
-                "select id from orders where week = ? and delivery_date = ? and status = 'draft'",
-                (str(week), str(delivery)),
-            ).fetchall()
-            for row in stale:
-                conn.execute("delete from order_lines where order_id = ?", (row["id"],))
-                conn.execute("delete from orders where id = ?", (row["id"],))
-
-            # Mark swept selections so re-running never double-counts them
+        conn.execute(
+            "update selections set status = 'ordered' "
+            "where week = ? and status in ('pending', 'confirmed')",
+            (str(week),),
+        )
+        cur = conn.execute(
+            "insert into orders (week, delivery_date, status) values (?, ?, 'open') returning id",
+            (str(week), str(monday)),
+        )
+        order_id = cur.fetchone()["id"]
+        lines = []
+        for pid, qty in qty_by_product.items():
+            product = conn.execute(
+                "select name, price, url from products where id = ?", (pid,)
+            ).fetchone()
             conn.execute(
-                "update selections set status = 'ordered' "
-                "where week = ? and half = ? and status in ('pending', 'confirmed')",
-                (str(week), half),
+                "insert into order_lines (order_id, product_id, qty, unit_price) values (?, ?, ?, ?)",
+                (order_id, pid, qty, product["price"]),
             )
-            cur = conn.execute(
-                "insert into orders (week, delivery_date, status) values (?, ?, 'draft') returning id",
-                (str(week), str(delivery)),
-            )
-            order_id = cur.fetchone()["id"]
-            lines = []
-            for pid, qty in qty_by_product.items():
-                product = conn.execute(
-                    "select name, price, url from products where id = ?", (pid,)
-                ).fetchone()
-                conn.execute(
-                    "insert into order_lines (order_id, product_id, qty, unit_price) values (?, ?, ?, ?)",
-                    (order_id, pid, qty, product["price"]),
-                )
-                lines.append({"product_id": pid, "name": product["name"],
-                              "qty": qty, "unit_price": product["price"],
-                              "url": product["url"]})
-            orders.append({"id": order_id, "week": str(week), "delivery_date": str(delivery),
-                           "status": "draft", "lines": lines})
-    return orders
+            lines.append({"product_id": pid, "name": product["name"],
+                          "qty": qty, "unit_price": product["price"],
+                          "url": product["url"]})
+        return [{"id": order_id, "week": str(week), "delivery_date": str(monday),
+                 "status": "open", "lines": lines}]
 
 
 def order_lines(order_id):
@@ -312,19 +287,6 @@ def set_product_sainsburys(product_id, uid, url=None):
         "update products set sainsburys_uid = ?, url = coalesce(?, url) where id = ?",
         (uid, url, product_id),
     )
-
-
-def approve_order(order_id):
-    """Transition draft → approved. Returns the Order."""
-    order = _q(
-        "update orders set status = 'approved' where id = ? and status = 'draft' "
-        "returning id, week, delivery_date, status",
-        (order_id,),
-        fetch="one",
-    )
-    if not order:
-        raise ValueError("order %s not found or not a draft" % order_id)
-    return order
 
 
 # ── Check-in / consumption ────────────────────────────────────────────────────
