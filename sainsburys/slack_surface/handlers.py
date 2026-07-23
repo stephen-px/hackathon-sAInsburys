@@ -159,6 +159,26 @@ def register(app):
         ack()
         _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.0))
 
+    # ── /reset (end-of-week sweep: waste logged & scored, orders wiped) ─────────
+
+    @app.command("/reset")
+    def reset(ack, respond, client, body):
+        ack()
+
+        def _go():
+            from slack_surface import blocks as blk
+            digest = store.sweep_waste()
+            store.wipe_orders()
+            print("[reset] wasted £%.2f across %d items; orders wiped"
+                  % (digest["wasted_value"], digest["wasted_items"]), flush=True)
+            client.chat_postMessage(
+                channel=body["channel_id"],
+                text="🗑️ Weekly sweep: £%.2f wasted. Fresh week started." % digest["wasted_value"],
+                blocks=blk.digest_blocks(digest),
+            )
+
+        _run(respond, _go)
+
     # ── /demo-rescue (mirrors the real Fri 11:30 trigger) ───────────────────────
 
     @app.command("/demo-rescue")

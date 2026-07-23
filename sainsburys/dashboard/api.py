@@ -160,13 +160,18 @@ def leaderboard():
         if conn is None:
             return jsonify(MOCK_LEADERBOARD if ALLOW_MOCK else [])
         cur = conn.cursor()
+        # Net points: claimed (rescued) earns, wasted costs. `saved` keeps the
+        # legacy key name but now carries the NET score the UI ranks by.
         cur.execute("""
             SELECT e.user_slack_id as slack_id,
                    COALESCE(u.name, e.user_slack_id) as name,
-                   SUM(e.value) as saved
+                   ROUND(SUM(CASE WHEN e.kind = 'claimed' THEN e.value ELSE 0 END), 2) as claimed,
+                   ROUND(SUM(CASE WHEN e.kind = 'wasted'  THEN e.value ELSE 0 END), 2) as wasted,
+                   ROUND(SUM(CASE WHEN e.kind = 'claimed' THEN e.value
+                                 WHEN e.kind = 'wasted'  THEN -e.value ELSE 0 END), 2) as saved
             FROM events e
             LEFT JOIN users u ON u.slack_id = e.user_slack_id
-            WHERE e.kind = 'claimed'
+            WHERE e.kind IN ('claimed', 'wasted') AND e.user_slack_id IS NOT NULL
             GROUP BY e.user_slack_id
             ORDER BY saved DESC
             LIMIT 10

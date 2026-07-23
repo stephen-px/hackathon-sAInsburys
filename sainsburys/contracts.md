@@ -35,9 +35,10 @@ approve_order(order_id) -> Order
 leftovers(week=None) -> list[{product_id, name, price, qty_left, days_left}]
 claim_product(product_id, user) -> {product_id, name, value, qty_left}
 
-# TODO — not yet implemented
-sweep_waste(week) -> Digest
-leaderboard() -> list
+# Sweep / reset / scoring (implemented — /demo-sweep, /reset)
+sweep_waste(week=None) -> {wasted_items, wasted_value, by_user}  # waste attributed to orderers, claims prorated
+wipe_orders() -> None                    # clears selections/orders; events history survives
+leaderboard() -> [{slack_id, name, claimed, wasted, net}]  # net = claimed − wasted, desc
 weekly_totals() -> list
 ```
 

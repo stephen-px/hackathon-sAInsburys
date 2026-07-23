@@ -520,36 +520,129 @@ def claimed_total(week=None):
 
 # ── Digest / reporting ────────────────────────────────────────────────────────
 
-def sweep_waste(week):
+def _ordered_by_user(week=None):
+    """Ordered qty per (user, product) for the week + product meta. Shared by
+    leftovers-style calculations and the waste sweep."""
+    from datetime import date, timedelta
+    today = date.today()
+    monday = date.fromisoformat(str(week)) if week else today - timedelta(days=today.weekday())
+    ordered, meta = {}, {}
+    selections = _q(
+        "select user_slack_id, meal_id, parsed from selections "
+        "where week = ? and status not in ('void', 'proposed')",
+        (str(monday),),
+        fetch="all",
+    ) or []
+    for sel in selections:
+        if sel["meal_id"]:
+            lines = _q("select product_id, qty from meal_products where meal_id = ?",
+                       (sel["meal_id"],), fetch="all") or []
+        elif sel["parsed"]:
+            lines = json.loads(sel["parsed"]).get("product_lines", [])
+        else:
+            continue
+        for line in lines:
+            pid = line["product_id"]
+            if pid not in meta:
+                product = _q("select name, price from products where id = ?", (pid,), fetch="one")
+                if not product:
+                    continue
+                meta[pid] = {"name": product["name"], "price": product["price"]}
+            key = (sel["user_slack_id"], pid)
+            ordered[key] = ordered.get(key, 0) + line["qty"]
+    return monday, ordered, meta
+
+
+def sweep_waste(week=None):
     """
-    End-of-week sweep: whatever's still unclaimed/unconsumed in leftovers() is
-    logged as 'wasted'. Product-based (no lots) to match the check-in model.
-    Returns {wasted_items, wasted_value}.
+    End-of-week sweep (the /reset moment): everything ordered but not eaten and
+    not claimed is logged as 'wasted' — ATTRIBUTED to whoever ordered it, so
+    wasters lose leaderboard points. Not checking in doesn't dodge the score:
+    with no check-in the whole ordered qty counts as unconsumed.
+
+    Claims are product-level (anyone can rescue anyone's food), so each
+    product's claimed qty reduces its orderers' waste proportionally.
+    Returns {wasted_items, wasted_value, by_user: [{slack_id, name, wasted}]}.
     """
-    items = leftovers(week)
-    total_value = 0.0
+    monday, ordered, meta = _ordered_by_user(week)
+
+    consumed = _q(
+        "select user_slack_id, product_id, qty from ("
+        "  select user_slack_id, product_id, qty, row_number() over ("
+        "    partition by user_slack_id, product_id order by ts desc, id desc) as rn"
+        "  from events where kind = 'consumed' and date(ts) >= ?"
+        ") where rn = 1",
+        (str(monday),),
+        fetch="all",
+    ) or []
+    consumed_by = {(ev["user_slack_id"], ev["product_id"]): ev["qty"] for ev in consumed}
+
+    removed = _q(  # already left the fridge: rescued or previously swept
+        "select product_id, sum(qty) as q from events "
+        "where kind in ('claimed', 'wasted') and date(ts) >= ? group by product_id",
+        (str(monday),),
+        fetch="all",
+    ) or []
+    removed_by_product = {ev["product_id"]: ev["q"] for ev in removed}
+
+    # Per-user unconsumed, and per-product totals to prorate claims across users
+    unconsumed = {k: max(0, qty - consumed_by.get(k, 0)) for k, qty in ordered.items()}
+    total_unconsumed = {}
+    for (user, pid), qty in unconsumed.items():
+        total_unconsumed[pid] = total_unconsumed.get(pid, 0) + qty
+
+    by_user, total_value, wasted_items = {}, 0.0, set()
     with _tx() as conn:
-        for item in items:
-            qty = item["qty_left"]
-            value = round(float(qty) * float(item["price"]), 2)
-            total_value += value
+        for (user, pid), qty in unconsumed.items():
+            if qty <= 0 or total_unconsumed[pid] <= 0:
+                continue
+            pool_left = max(0, total_unconsumed[pid] - removed_by_product.get(pid, 0))
+            share = round(qty * pool_left / total_unconsumed[pid], 2)
+            if share < 0.01:
+                continue
+            value = round(share * float(meta[pid]["price"]), 2)
             conn.execute(
-                "insert into events (kind, product_id, qty, value) values ('wasted', ?, ?, ?)",
-                (item["product_id"], qty, value),
+                "insert into events (kind, user_slack_id, product_id, qty, value) "
+                "values ('wasted', ?, ?, ?, ?)",
+                (user, pid, share, value),
             )
-    return {"wasted_items": len(items), "wasted_value": round(total_value, 2)}
+            by_user[user] = round(by_user.get(user, 0) + value, 2)
+            total_value += value
+            wasted_items.add(pid)
+
+    names = {u["slack_id"]: u["name"] for u in
+             (_q("select slack_id, name from users", fetch="all") or [])}
+    ranking = sorted(
+        ({"slack_id": u, "name": names.get(u, u), "wasted": v} for u, v in by_user.items()),
+        key=lambda r: r["wasted"], reverse=True,
+    )
+    return {"wasted_items": len(wasted_items), "wasted_value": round(total_value, 2),
+            "by_user": ranking}
+
+
+def wipe_orders():
+    """The /reset wipe: clear all ordering state for a fresh week. Events (the
+    score history), users, and the catalogue survive."""
+    with _tx() as conn:
+        conn.execute("delete from order_lines")
+        conn.execute("delete from orders")
+        conn.execute("delete from selections")
 
 
 def leaderboard():
+    """Net points: £ claimed (rescued) minus £ wasted. Wasting food costs you."""
     return _q("""
         SELECT e.user_slack_id as slack_id,
                COALESCE(u.name, e.user_slack_id) as name,
-               SUM(e.value) as saved
+               ROUND(SUM(CASE WHEN e.kind = 'claimed' THEN e.value ELSE 0 END), 2) as claimed,
+               ROUND(SUM(CASE WHEN e.kind = 'wasted'  THEN e.value ELSE 0 END), 2) as wasted,
+               ROUND(SUM(CASE WHEN e.kind = 'claimed' THEN e.value
+                             WHEN e.kind = 'wasted'  THEN -e.value ELSE 0 END), 2) as net
         FROM events e
         LEFT JOIN users u ON u.slack_id = e.user_slack_id
-        WHERE e.kind = 'claimed'
+        WHERE e.kind IN ('claimed', 'wasted') AND e.user_slack_id IS NOT NULL
         GROUP BY e.user_slack_id
-        ORDER BY saved DESC LIMIT 10
+        ORDER BY net DESC LIMIT 10
     """, fetch="all") or []
 
 

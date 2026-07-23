@@ -22,12 +22,27 @@ def basket_blocks(order):
 
 
 def digest_blocks(digest):
-    """Weekly waste sweep summary."""
+    """Weekly waste sweep summary + wall of shame, posted by /reset."""
     n = digest.get("wasted_items", 0)
     v = digest.get("wasted_value", 0.0)
-    msg = ("🗑️ *%d item%s swept as waste — £%.2f lost.*  "
-           "Less next week: order only what you'll eat." % (n, "s" if n != 1 else "", v))
-    return [{"type": "section", "text": {"type": "mrkdwn", "text": msg}}]
+    out = [
+        {"type": "header", "text": {"type": "plain_text", "text": "🗑️ Weekly sweep"}},
+        {"type": "section", "text": {"type": "mrkdwn",
+            "text": "*%d item%s went in the bin — £%.2f wasted.*" % (n, "s" if n != 1 else "", v)
+                    if n else "*Nothing wasted — clean fridge!* 🎉"}},
+    ]
+    wasters = digest.get("by_user") or []
+    if wasters:
+        medals = ["🥇", "🥈", "🥉"]
+        lines = "\n".join(
+            "%s <@%s> — £%.2f binned" % (medals[i] if i < 3 else "·", w["slack_id"], w["wasted"])
+            for i, w in enumerate(wasters[:5])
+        )
+        out.append({"type": "section", "text": {"type": "mrkdwn",
+                    "text": "*Biggest wasters* (points deducted):\n%s" % lines}})
+    out.append({"type": "context", "elements": [{"type": "mrkdwn",
+                "text": "Orders wiped — fresh week starts now. Wasted £ counts against your leaderboard score."}]})
+    return out
 
 
 def order_confirmation_blocks(selection_id, half, lines_text, notes, order_text):
