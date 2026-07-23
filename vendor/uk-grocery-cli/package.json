@@ -1,0 +1,57 @@
+{
+  "name": "uk-grocery-cli",
+  "version": "2.1.0",
+  "description": "Multi-supermarket grocery CLI for UK. Sainsbury's, Ocado, and more. Built for AI agents.",
+  "type": "commonjs",
+  "main": "dist/cli.js",
+  "bin": {
+    "groc": "./dist/cli.js",
+    "groc-mcp": "./dist/mcp-server.js",
+    "groc-api": "./dist/http-server.js",
+    "groc-auth-server": "./dist/auth-server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "groc": "tsx src/cli.ts",
+    "api": "tsx src/http-server.ts",
+    "mcp": "tsx src/mcp-server.ts",
+    "auth-server": "tsx src/auth-server.ts",
+    "setup": "./setup.sh"
+  },
+  "keywords": [
+    "groceries",
+    "sainsburys",
+    "ocado",
+    "tesco",
+    "uk",
+    "shopping",
+    "automation",
+    "ai-agent",
+    "cli",
+    "mcp",
+    "model-context-protocol",
+    "claude-desktop"
+  ],
+  "author": "Zishan Ashraf",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abracadabra50/uk-grocery-cli"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "playwright": "^1.40.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0"
+  }
+}

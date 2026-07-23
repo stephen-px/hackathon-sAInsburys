@@ -1,3 +1,4 @@
+import grocery
 import store
 from flows import basket, rescue
 from flows.basket import _current_week
@@ -62,6 +63,77 @@ def register(app):
     def on_refine_submit(ack, body, client):
         ack()
         basket.handle_refine_submit(body, client)
+
+    # ── /authenticate (reconnect a stale Sainsbury's session) ───────────────────
+
+    @app.command("/authenticate")
+    def authenticate(ack, client, body):
+        ack()
+        client.views_open(trigger_id=body["trigger_id"], view=_authenticate_modal())
+
+    @app.view("authenticate_submit")
+    def on_authenticate_submit(ack, body, client):
+        # ack() FIRST: start_login() drives a real browser (multiple waits
+        # adding up to 10-20s+) — Slack needs the view_submission acked within
+        # 3s or the modal shows "trouble connecting", even though the work
+        # below finishes fine. Same reasoning as on_authenticate_mfa_submit.
+        ack()
+        values = body["view"]["state"]["values"]
+        email = values["auth_email"]["email"].get("value", "").strip()
+        password = values["auth_password"]["password"].get("value", "") or ""
+        user_id = body["user"]["id"]
+
+        try:
+            result = grocery.start_login(email, password)
+        except Exception as e:
+            _dm(client, user_id, "❌ Couldn't reach the login helper: %s. Run /authenticate to try again." % e)
+            return
+
+        if result.get("status") == "mfa_required":
+            # No fresh trigger_id is available this long after the original
+            # one expired, so prompt via a button click instead of pushing a
+            # modal directly — the button click hands us a new trigger_id.
+            _dm(client, user_id, "📱 Check your phone for the 6-digit Sainsbury's code.",
+                blocks=[
+                    {"type": "section", "text": {"type": "mrkdwn",
+                     "text": "📱 Check your phone for the 6-digit Sainsbury's code."}},
+                    {"type": "actions", "elements": [
+                        {"type": "button", "style": "primary",
+                         "text": {"type": "plain_text", "text": "Enter code"},
+                         "action_id": "authenticate_enter_mfa", "value": result["handle"]},
+                    ]},
+                ])
+            return
+
+        _dm(client, user_id, "✅ Sainsbury's connected — trolley pushes will work again.")
+
+    @app.action("authenticate_enter_mfa")
+    def on_authenticate_enter_mfa(ack, body, client):
+        ack()
+        handle = body["actions"][0]["value"]
+        client.views_open(trigger_id=body["trigger_id"], view=_authenticate_mfa_modal(handle))
+
+    @app.view("authenticate_mfa_submit")
+    def on_authenticate_mfa_submit(ack, body, client):
+        # Same ack-first reasoning as on_authenticate_submit — submit_mfa()
+        # also waits on a real page redirect.
+        ack()
+        handle = body["view"]["private_metadata"]
+        values = body["view"]["state"]["values"]
+        code = values["auth_mfa_code"]["code"].get("value", "").strip()
+        user_id = body["user"]["id"]
+
+        try:
+            result = grocery.submit_mfa(handle, code)
+        except Exception as e:
+            _dm(client, user_id, "❌ %s: %s. Run /authenticate to try again." % (type(e).__name__, e))
+            return
+
+        if result.get("status") == "ok":
+            _dm(client, user_id, "✅ Sainsbury's connected — trolley pushes will work again.")
+        else:
+            _dm(client, user_id, "❌ %s Run /authenticate to try again."
+                                 % result.get("message", "MFA verification failed."))
 
     # ── /demo-aggregate (post the week's consolidated basket) ────────────────────
 
@@ -244,6 +316,11 @@ def _run(respond, thunk):
                  "response_type": "ephemeral", "replace_original": False})
 
 
+def _dm(client, user_id, text, blocks=None):
+    dm = client.conversations_open(users=user_id)
+    client.chat_postMessage(channel=dm["channel"]["id"], text=text, blocks=blocks)
+
+
 def _channel_id(body):
     channel = body.get("channel") or {}
     return channel.get("id") or body["container"]["channel_id"]
@@ -315,6 +392,53 @@ def _refine_modal(selection_id):
                     "placeholder": {"type": "plain_text",
                                     "text": "e.g. no fish, add a drink, something more filling"},
                 },
+            },
+        ],
+    }
+
+
+def _authenticate_modal():
+    return {
+        "type": "modal",
+        "callback_id": "authenticate_submit",
+        "title": {"type": "plain_text", "text": "Reconnect Sainsbury's"},
+        "submit": {"type": "plain_text", "text": "Log in"},
+        "blocks": [
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn",
+                         "text": "Slack can't mask this field — anyone who can see your "
+                                 "screen while you type sees it in plain text."},
+            },
+            {
+                "type": "input",
+                "block_id": "auth_email",
+                "label": {"type": "plain_text", "text": "Sainsbury's email"},
+                "element": {"type": "plain_text_input", "action_id": "email"},
+            },
+            {
+                "type": "input",
+                "block_id": "auth_password",
+                "label": {"type": "plain_text", "text": "Password"},
+                "element": {"type": "plain_text_input", "action_id": "password"},
+            },
+        ],
+    }
+
+
+def _authenticate_mfa_modal(handle):
+    return {
+        "type": "modal",
+        "callback_id": "authenticate_mfa_submit",
+        "private_metadata": handle,
+        "title": {"type": "plain_text", "text": "Enter your code"},
+        "submit": {"type": "plain_text", "text": "Confirm"},
+        "blocks": [
+            {
+                "type": "input",
+                "block_id": "auth_mfa_code",
+                "label": {"type": "plain_text", "text": "6-digit code sent to your phone"},
+                "element": {"type": "plain_text_input", "action_id": "code"},
             },
         ],
     }

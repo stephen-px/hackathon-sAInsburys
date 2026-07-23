@@ -23,6 +23,10 @@ SESSION_FILE = Path.home() / ".sainsburys" / "session.json"
 STORE_NUMBER = os.environ.get("SAINSBURYS_STORE_NUMBER", "0560")
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 
+# vendor/uk-grocery-cli's auth-server (src/auth-server.ts) — see /authenticate
+# in slack_surface/handlers.py. Spawned by app.py; localhost-only, never the network.
+AUTH_SERVER = os.environ.get("GROC_AUTH_SERVER", "http://127.0.0.1:7877")
+
 
 class NotConnected(Exception):
     """No usable Sainsbury's session — run the uk-grocery-cli login."""
@@ -78,6 +82,25 @@ def is_connected():
         return True
     except Exception:
         return False
+
+
+def start_login(email, password):
+    """Phase 1 of the /authenticate flow — POSTs to the auth-server (see
+    vendor/uk-grocery-cli/src/auth-server.ts). Returns the parsed JSON:
+    {"status": "ok"} or {"status": "mfa_required", "handle": "..."}."""
+    resp = requests.post(AUTH_SERVER + "/login/start",
+                         json={"email": email, "password": password}, timeout=60)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def submit_mfa(handle, code):
+    """Phase 2 — completes a login started by start_login(). Returns
+    {"status": "ok"} or {"status": "error", "message": "..."}."""
+    resp = requests.post(AUTH_SERVER + "/login/mfa",
+                         json={"handle": handle, "code": code}, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def search(query, limit=8):

@@ -16,6 +16,8 @@ features:
       description: Post the rescue board with one-tap claiming
     - command: /demo-sweep
       description: End-of-week waste sweep and leaderboard digest
+    - command: /authenticate
+      description: Reconnect a stale Sainsbury's session (email/password + SMS code)
 oauth_config:
   scopes:
     bot:

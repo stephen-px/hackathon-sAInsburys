@@ -205,17 +205,26 @@ def push_selection_to_trolley(client, dm_channel, result):
     """Add one parsed selection's lines to the real trolley, DM the outcome.
 
     Runs when the user taps "Order it ✅" — human confirms the plan, then the
-    trolley fills. No session → quiet skip. Never books a slot or checks out."""
+    trolley fills. No session → DM the user to reconnect. Never books a slot
+    or checks out."""
     product_lines = result.get("product_lines") or []
     if not product_lines:
         return
+    products = {p["id"]: p for p in store.get_products_by_ids(
+        [l["product_id"] for l in product_lines])}
     try:
         grocery._load_session()
     except grocery.NotConnected as e:
+        client.chat_postMessage(
+            channel=dm_channel,
+            text="⚠️ Sainsbury's session is stale — this order wasn't pushed to the "
+                 "real trolley. Run */authenticate* to reconnect, then tap *Order it* "
+                 "again — or add these yourself on sainsburys.co.uk for now:\n"
+                 + _format_lines(product_lines, products),
+            unfurl_links=False, unfurl_media=False,
+        )
         print("[trolley] push skipped: %s" % e, flush=True)
         return
-    products = {p["id"]: p for p in store.get_products_by_ids(
-        [l["product_id"] for l in product_lines])}
     lines = [{"product_id": l["product_id"],
               "name": products.get(l["product_id"], {}).get("name", ""),
               "qty": l["qty"],

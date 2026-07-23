@@ -1,0 +1,40 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Session files
+*.session.json
+.sainsburys/
+.ocado/
+
+# Build artifacts
+*.js.map
+!jest.config.js
+!setup.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+
+# Temp
+*.tmp
+tmp/
+temp/
+
+# Debug scripts (development only)
+capture-*.js
+test-*.js
+discover-*.js
+extract-*.js
+network-*.js

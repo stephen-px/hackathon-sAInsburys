@@ -33,9 +33,13 @@ services:
     command: python sainsburys/app.py
     volumes:
       - .:/app
-      # Sainsbury's session (from vendor/uk-grocery-cli login) so Approve can
-      # fill the real trolley. Read-only; absent file just skips the push.
-      - ${HOME}/.sainsburys:/root/.sainsburys:ro
+      # Anonymous volume: keep the image's Linux-native npm install (with a
+      # Linux Chromium binary) instead of letting the bind mount above shadow
+      # it with the host's own (macOS) vendor/uk-grocery-cli/node_modules.
+      - /app/vendor/uk-grocery-cli/node_modules
+      # Sainsbury's session (from vendor/uk-grocery-cli login, or /authenticate
+      # in Slack). Read-write: /authenticate needs to write a fresh session.
+      - ${HOME}/.sainsburys:/root/.sainsburys
     env_file:
       - sainsburys/.env
     depends_on:

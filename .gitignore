@@ -55,4 +55,6 @@ sainsburys/data/lunch.db
 sainsburys/data/lunch.db-shm
 sainsburys/data/lunch.db-wal
 receipts/*
-vendor/
+
+# Node (vendor/uk-grocery-cli) — the CLI itself is tracked, its build/deps aren't
+node_modules/
