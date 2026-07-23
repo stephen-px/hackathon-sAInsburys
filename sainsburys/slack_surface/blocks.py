@@ -69,25 +69,37 @@ def order_confirmation_blocks(selection_id, half, lines_text, notes, order_text)
     ]
 
 
-def suggestion_blocks(selection_id, lines_text, notes, mood):
-    """A proposed lunch plan with Accept / Refine buttons."""
+def suggestion_blocks(selection_id, lines_text, notes, mood, ordered=False):
+    """A lunch plan DM. Proposed: Order it / Change something. Ordered: stays
+    amendable — a Change button remains and edits apply straight away."""
     sid = str(selection_id)
-    header = ":bulb: *How about this?*"
+    header = ":white_check_mark: *Your order*" if ordered else ":bulb: *How about this?*"
     if notes:
         header += "\n_%s_" % notes
-    context = "You asked for: “%s”" % mood if (mood or "").strip() else "Surprise pick — no brief given"
-    return [
-        {"type": "section", "text": {"type": "mrkdwn", "text": header}},
-        {"type": "section", "text": {"type": "mrkdwn", "text": lines_text}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": context}]},
-        {"type": "actions", "elements": [
+    request = (mood or "").strip()
+    context = ("You asked for: “%s”" % request) if request and request != "(surprise me)" \
+        else "Surprise pick — no brief given"
+    if ordered:
+        context += "  ·  ✅ Ordered — changes apply straight away"
+        buttons = [
+            {"type": "button",
+             "text": {"type": "plain_text", "text": "Change something 🔄"},
+             "action_id": "suggestion_refine", "value": sid},
+        ]
+    else:
+        buttons = [
             {"type": "button", "style": "primary",
              "text": {"type": "plain_text", "text": "Order it ✅"},
              "action_id": "suggestion_accept", "value": sid},
             {"type": "button",
              "text": {"type": "plain_text", "text": "Change something 🔄"},
              "action_id": "suggestion_refine", "value": sid},
-        ]},
+        ]
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": header}},
+        {"type": "section", "text": {"type": "mrkdwn", "text": lines_text}},
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": context}]},
+        {"type": "actions", "elements": buttons},
     ]
 
 

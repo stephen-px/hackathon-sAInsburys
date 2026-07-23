@@ -17,17 +17,14 @@ def register(app):
         ack()
         basket.handle_order_submit(body, client)
 
-    # ── /suggest (open suggestions with accept/refine loop) ─────────────────────
+    # ── /suggest = alias for /order (one unified flow) ──────────────────────────
 
     @app.command("/suggest")
     def suggest(ack, client, body):
         ack()
-        client.views_open(trigger_id=body["trigger_id"], view=_suggest_modal())
-
-    @app.view("suggest_submit")
-    def on_suggest_submit(ack, body, client):
-        ack()
-        basket.handle_suggest_submit(body, client)
+        modal = _order_modal()
+        modal["private_metadata"] = body["channel_id"]
+        client.views_open(trigger_id=body["trigger_id"], view=modal)
 
     @app.action("suggestion_accept")
     def on_suggestion_accept(ack, respond, body, client):
@@ -37,7 +34,12 @@ def register(app):
             import json as _json
             selection_id = int(body["actions"][0]["value"])
             store.accept_selection(selection_id)
-            _replace_actions(respond, body, "✅ Ordered — it'll be in this week's basket!")
+            basket.on_plan_accepted()
+            # Swap to the ordered view — the plan stays amendable via Change something
+            respond({"blocks": basket.plan_view_blocks(selection_id, ordered=True),
+                     "text": "✅ Ordered — you can still change it.",
+                     "replace_original": True})
+            # Human confirmed the plan → fill the real Sainsbury's trolley
             sel = store.get_selection(selection_id)
             if sel and sel.get("parsed"):
                 basket.push_selection_to_trolley(client, _channel_id(body),
@@ -311,42 +313,6 @@ def _record_checkin(respond, body, client, fraction):
         )
 
 
-def _suggest_modal():
-    return {
-        "type": "modal",
-        "callback_id": "suggest_submit",
-        "title": {"type": "plain_text", "text": "Suggest my lunch"},
-        "submit": {"type": "plain_text", "text": "Suggest"},
-        "blocks": [
-            {
-                "type": "input",
-                "block_id": "suggest_mood",
-                "optional": True,
-                "label": {"type": "plain_text", "text": "What are you in the mood for?"},
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "mood",
-                    "placeholder": {"type": "plain_text",
-                                    "text": "e.g. something light, spicy, asian… or leave blank for a surprise"},
-                },
-            },
-            {
-                "type": "input",
-                "block_id": "suggest_half",
-                "label": {"type": "plain_text", "text": "Delivery"},
-                "element": {
-                    "type": "static_select",
-                    "action_id": "half",
-                    "options": [
-                        {"text": {"type": "plain_text", "text": "Early week (Mon)"}, "value": "early"},
-                        {"text": {"type": "plain_text", "text": "Late week (Wed)"}, "value": "late"},
-                    ],
-                },
-            },
-        ],
-    }
-
-
 def _refine_modal(selection_id):
     return {
         "type": "modal",
@@ -381,6 +347,7 @@ def _order_modal():
             {
                 "type": "input",
                 "block_id": "order_text",
+                "optional": True,
                 "label": {"type": "plain_text", "text": "What do you want?"},
                 "element": {
                     "type": "plain_text_input",
@@ -388,21 +355,8 @@ def _order_modal():
                     "multiline": True,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "e.g. 3 days of chicken wraps, one smoked salmon pitta, no dairy",
+                        "text": "An exact order, a mood (“something light”), or leave blank and I'll pick",
                     },
-                },
-            },
-            {
-                "type": "input",
-                "block_id": "order_half",
-                "label": {"type": "plain_text", "text": "Delivery"},
-                "element": {
-                    "type": "static_select",
-                    "action_id": "half",
-                    "options": [
-                        {"text": {"type": "plain_text", "text": "Early week (Mon)"}, "value": "early"},
-                        {"text": {"type": "plain_text", "text": "Late week (Wed)"}, "value": "late"},
-                    ],
                 },
             },
         ],

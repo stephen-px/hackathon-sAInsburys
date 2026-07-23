@@ -2,7 +2,7 @@ import json
 
 import grocery
 import store
-from agents import parser as parser_agent
+from agents import concierge
 from datetime import date, timedelta
 from slack_surface import blocks
 
@@ -23,25 +23,46 @@ def _format_lines(product_lines, products):
     return "\n".join(lines)
 
 
-def _send_confirmation(client, dm_channel, selection_id, result, order_text, half):
+def _send_plan(client, dm_channel, selection_id, result, request_text, ordered=False):
+    """DM the plan. Proposed → Order it / Change; ordered → amendable Change."""
     product_ids = [line["product_id"] for line in result.get("product_lines", [])]
     products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
     lines_text = _format_lines(result.get("product_lines", []), products)
-    notes = result.get("notes") or ""
     client.chat_postMessage(
         channel=dm_channel,
-        text="Order logged for %s week: %s" % (half, lines_text),
-        blocks=blocks.order_confirmation_blocks(selection_id, half, lines_text, notes, order_text),
+        text="%s: %s" % ("Your order" if ordered else "Proposed lunch",
+                         result.get("notes") or lines_text),
+        blocks=blocks.suggestion_blocks(selection_id, lines_text,
+                                        result.get("notes") or "", request_text,
+                                        ordered=ordered),
         unfurl_links=False, unfurl_media=False,
     )
 
 
+def plan_view_blocks(selection_id, ordered):
+    """Rebuild the plan DM blocks for an existing selection (used on Accept)."""
+    sel = store.get_selection(selection_id)
+    parsed = json.loads(sel["parsed"]) if sel and sel["parsed"] else {}
+    product_ids = [line["product_id"] for line in parsed.get("product_lines", [])]
+    products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
+    lines_text = _format_lines(parsed.get("product_lines", []), products)
+    return blocks.suggestion_blocks(selection_id, lines_text,
+                                    parsed.get("notes") or "",
+                                    sel["freeform"] if sel else "", ordered=ordered)
+
+
 def handle_order_submit(body, client):
+    """
+    One flow for everything: concrete requests get parsed, vague or empty ones
+    get a suggestion — either way the user reviews a proposal and taps
+    Order it / Change something.
+    """
     user_id = body["user"]["id"]
     user_name = body["user"].get("username", body["user"].get("name", user_id))
     values = body["view"]["state"]["values"]
-    order_text = values["order_text"]["text"]["value"]
-    half = values["order_half"]["half"]["selected_option"]["value"]
+    order_text = (values["order_text"]["text"].get("value") or "").strip()
+    # Delivery halves were dropped from the UX — everything is one weekly basket.
+    half = "early"
     week = _current_week()
 
     store.ensure_user(user_id, user_name)
@@ -50,129 +71,43 @@ def handle_order_submit(body, client):
     dm_channel = dm["channel"]["id"]
     client.chat_postMessage(
         channel=dm_channel,
-        text=":mag: Parsing your order... one sec!",
+        text=":bulb: On it — putting your lunch together..." if not order_text
+             else ":mag: Parsing your order... one sec!",
     )
 
-    print("[order] user=%s half=%s text=%r" % (user_id, half, order_text), flush=True)
+    print("[plan] user=%s half=%s text=%r" % (user_id, half, order_text), flush=True)
 
     try:
-        result = parser_agent.parse(user_id, order_text, half)
+        result = concierge.plan(user_id, order_text, half)
 
         if result.get("rejected"):
-            print("[order] rejected: %s" % result["rejected"], flush=True)
+            print("[plan] rejected: %s" % result["rejected"], flush=True)
             client.chat_postMessage(
                 channel=dm_channel,
                 text=":no_good: %s\n_Your request: \"%s\"_" % (result["rejected"], order_text),
             )
             return
 
-        row = store.record_selection(user_id, week, half, freeform=order_text, parsed=result)
-        print("[order] recorded selection id=%s lines=%s" % (row["id"], result.get("product_lines")), flush=True)
-        # Rebuild draft baskets so the dashboard shows the updated basket immediately
-        try:
-            store.build_baskets(week)
-        except Exception as e:
-            print("[order] build_baskets failed (non-fatal): %s" % e, flush=True)
-
-        _send_confirmation(client, dm_channel, row["id"], result, order_text, half)
-        # Trolley push happens when the user taps "Looks right ✅" (order_confirm)
-        # — the parsed plan must be human-confirmed before touching the real basket.
+        row = store.record_selection(user_id, week, half,
+                                     freeform=order_text or "(surprise me)",
+                                     parsed=result, status="proposed")
+        print("[plan] proposed selection id=%s lines=%s" % (row["id"], result.get("product_lines")), flush=True)
+        # Trolley push happens when the user taps "Order it ✅" — the plan must
+        # be human-confirmed before touching the real basket.
+        _send_plan(client, dm_channel, row["id"], result, order_text)
 
     except Exception as e:
         row = store.record_selection(user_id, week, half, freeform=order_text)
-        print("[order] parse failed (%s), saved raw as id=%s" % (e, row["id"]), flush=True)
+        print("[plan] failed (%s), saved raw as id=%s" % (e, row["id"]), flush=True)
         client.chat_postMessage(
             channel=dm_channel,
-            text="Couldn't parse your order — saved the raw request.",
+            text="Couldn't put a plan together — saved the raw request.",
             blocks=blocks.order_failure_blocks(row["id"], order_text, "%s: %s" % (type(e).__name__, e)),
         )
 
 
-def handle_retry(selection_id, client, dm_channel):
-    """Re-run the parser on a saved-but-unparsed selection (Retry button)."""
-    sel = store.get_selection(selection_id)
-    if not sel or not sel["freeform"]:
-        client.chat_postMessage(channel=dm_channel, text="🤔 Can't find that order any more.")
-        return
-    client.chat_postMessage(channel=dm_channel, text=":mag: Retrying the parse...")
-    try:
-        result = parser_agent.parse(sel["user_slack_id"], sel["freeform"], sel["half"])
-        if result.get("rejected"):
-            client.chat_postMessage(channel=dm_channel, text=":no_good: %s" % result["rejected"])
-            return
-        store.update_selection_parsed(selection_id, result)
-        _send_confirmation(client, dm_channel, selection_id, result, sel["freeform"], sel["half"])
-    except Exception as e:
-        client.chat_postMessage(
-            channel=dm_channel,
-            text=":warning: Still couldn't parse it (%s). Try rewording with /order." % type(e).__name__,
-        )
-
-
-def prefilled_order_modal(selection_id):
-    """The /order modal pre-filled from an existing selection (Fix it button)."""
-    from slack_surface.handlers import _order_modal
-    sel = store.get_selection(selection_id)
-    modal = _order_modal()
-    if sel:
-        modal["blocks"][0]["element"]["initial_value"] = sel["freeform"] or ""
-        half = sel["half"] or "early"
-        label = "Early week (Mon)" if half == "early" else "Late week (Wed)"
-        modal["blocks"][1]["element"]["initial_option"] = {
-            "text": {"type": "plain_text", "text": label}, "value": half}
-    return modal
-
-
-# ── /suggest: open suggestions with an accept/refine loop ──────────────────────
-
-def _send_suggestion(client, dm_channel, selection_id, result, mood):
-    product_ids = [line["product_id"] for line in result.get("product_lines", [])]
-    products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
-    lines_text = _format_lines(result.get("product_lines", []), products)
-    client.chat_postMessage(
-        channel=dm_channel,
-        text="Suggestion: %s" % (result.get("notes") or lines_text),
-        blocks=blocks.suggestion_blocks(selection_id, lines_text,
-                                        result.get("notes") or "", mood),
-        unfurl_links=False, unfurl_media=False,
-    )
-
-
-def handle_suggest_submit(body, client):
-    from agents import suggester
-    user_id = body["user"]["id"]
-    user_name = body["user"].get("username", body["user"].get("name", user_id))
-    values = body["view"]["state"]["values"]
-    mood = (values["suggest_mood"]["mood"].get("value") or "").strip()
-    half = values["suggest_half"]["half"]["selected_option"]["value"]
-    week = _current_week()
-
-    store.ensure_user(user_id, user_name)
-    dm = client.conversations_open(users=user_id)
-    dm_channel = dm["channel"]["id"]
-    client.chat_postMessage(channel=dm_channel, text=":bulb: Thinking up a lunch for you...")
-
-    print("[suggest] user=%s half=%s mood=%r" % (user_id, half, mood), flush=True)
-    try:
-        result = suggester.suggest(user_id, mood, half)
-        if result.get("rejected"):
-            client.chat_postMessage(channel=dm_channel, text=":no_good: %s" % result["rejected"])
-            return
-        row = store.record_selection(user_id, week, half, freeform=mood or "(surprise me)",
-                                     parsed=result, status="proposed")
-        print("[suggest] proposed selection id=%s" % row["id"], flush=True)
-        _send_suggestion(client, dm_channel, row["id"], result, mood)
-    except Exception as e:
-        client.chat_postMessage(
-            channel=dm_channel,
-            text=":warning: Couldn't come up with a suggestion (%s: %s) — try again "
-                 "or use /order directly." % (type(e).__name__, e),
-        )
-
-
 def handle_refine_submit(body, client):
-    """User told us what to change about a proposed suggestion."""
-    from agents import suggester
+    """User told us what to change about a proposed plan — re-run with context."""
     selection_id = int(body["view"]["private_metadata"])
     feedback = body["view"]["state"]["values"]["refine_text"]["feedback"]["value"]
     user_id = body["user"]["id"]
@@ -181,28 +116,83 @@ def handle_refine_submit(body, client):
     dm_channel = dm["channel"]["id"]
 
     sel = store.get_selection(selection_id)
-    if not sel or sel["status"] != "proposed":
+    if not sel or sel["status"] == "void":
         client.chat_postMessage(channel=dm_channel,
-                                text="🤔 That suggestion is gone — run /suggest again.")
+                                text="🤔 That plan is gone — run /order again.")
         return
 
+    # Amending an already-placed order keeps it placed; a proposal stays a proposal.
+    ordered = sel["status"] != "proposed"
+    keep_status = "proposed" if not ordered else \
+        ("pending" if sel["status"] == "ordered" else sel["status"])
+
     client.chat_postMessage(channel=dm_channel, text=":bulb: Reworking it...")
-    print("[suggest] refine id=%s feedback=%r" % (selection_id, feedback), flush=True)
+    print("[plan] refine id=%s ordered=%s feedback=%r" % (selection_id, ordered, feedback), flush=True)
     try:
         previous = json.loads(sel["parsed"]) if sel["parsed"] else None
-        result = suggester.suggest(user_id, sel["freeform"], sel["half"],
-                                   previous=previous, feedback=feedback)
+        result = concierge.plan(user_id, sel["freeform"], sel["half"],
+                                previous=previous, feedback=feedback)
+        if result.get("rejected"):
+            client.chat_postMessage(channel=dm_channel, text=":no_good: %s" % result["rejected"])
+            return
+        store.update_selection_parsed(selection_id, result, status=keep_status)
+        if ordered:
+            on_plan_accepted()   # order changed — refresh draft baskets for the dashboard
+        _send_plan(client, dm_channel, selection_id, result, sel["freeform"], ordered=ordered)
+        if ordered:
+            # The previous version of this order was already pushed to the real
+            # trolley; we never remove items, so flag the drift for a human.
+            client.chat_postMessage(
+                channel=dm_channel,
+                text="♻️ Order changed after it was placed — <%s|check your "
+                     "Sainsbury's trolley>: earlier items may need removing "
+                     "or swapping by hand." % grocery.TROLLEY_URL,
+                unfurl_links=False, unfurl_media=False)
+    except Exception as e:
+        client.chat_postMessage(
+            channel=dm_channel,
+            text=":warning: Refinement failed (%s: %s) — the previous plan "
+                 "still stands." % (type(e).__name__, e),
+        )
+
+
+def handle_retry(selection_id, client, dm_channel):
+    """Re-run the concierge on a saved-but-unparsed selection (Retry button)."""
+    sel = store.get_selection(selection_id)
+    if not sel or not sel["freeform"]:
+        client.chat_postMessage(channel=dm_channel, text="🤔 Can't find that order any more.")
+        return
+    client.chat_postMessage(channel=dm_channel, text=":mag: Retrying...")
+    try:
+        result = concierge.plan(sel["user_slack_id"], sel["freeform"], sel["half"])
         if result.get("rejected"):
             client.chat_postMessage(channel=dm_channel, text=":no_good: %s" % result["rejected"])
             return
         store.update_selection_parsed(selection_id, result, status="proposed")
-        _send_suggestion(client, dm_channel, selection_id, result, sel["freeform"])
+        _send_plan(client, dm_channel, selection_id, result, sel["freeform"])
     except Exception as e:
         client.chat_postMessage(
             channel=dm_channel,
-            text=":warning: Refinement failed (%s: %s) — the previous suggestion "
-                 "still stands." % (type(e).__name__, e),
+            text=":warning: Still couldn't do it (%s). Try rewording with /order." % type(e).__name__,
         )
+
+
+def on_plan_accepted(week=None):
+    """After an accept, rebuild draft baskets so the dashboard updates live."""
+    try:
+        store.build_baskets(week or _current_week())
+    except Exception as e:
+        print("[plan] build_baskets failed (non-fatal): %s" % e, flush=True)
+
+
+def prefilled_order_modal(selection_id):
+    """The /order modal pre-filled from an existing selection (legacy Fix it button)."""
+    from slack_surface.handlers import _order_modal
+    sel = store.get_selection(selection_id)
+    modal = _order_modal()
+    if sel:
+        modal["blocks"][0]["element"]["initial_value"] = sel["freeform"] or ""
+    return modal
 
 
 # Team decision: no delivery tracking — /order writes selections, and the
@@ -227,8 +217,8 @@ def push_to_trolley(order_id):
 def push_selection_to_trolley(client, dm_channel, result):
     """Add one parsed selection's lines to the real trolley, DM the outcome.
 
-    Runs at /order (and suggestion-accept) time — the trolley IS the basket.
-    No session → quiet skip with a hint. Never books a slot or checks out."""
+    Runs when the user taps "Order it ✅" — human confirms the plan, then the
+    trolley fills. No session → quiet skip. Never books a slot or checks out."""
     product_lines = result.get("product_lines") or []
     if not product_lines:
         return

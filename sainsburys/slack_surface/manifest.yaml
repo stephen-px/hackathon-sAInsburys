@@ -5,9 +5,9 @@ features:
     display_name: sAInsburys
   slash_commands:
     - command: /order
-      description: Order your lunch for the week
+      description: Order lunch — exact request, a mood, or blank for a suggestion
     - command: /suggest
-      description: Get a lunch suggestion — accept it or ask for changes
+      description: Same as /order — the bot picks when you don't
     - command: /demo-aggregate
       description: Build baskets from this week's orders and post for approval
     - command: /demo-checkin
