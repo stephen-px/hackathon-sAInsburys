@@ -8,14 +8,8 @@ features:
       description: Order lunch — exact request, a mood, or blank for a suggestion
     - command: /suggest
       description: Same as /order — the bot picks when you don't
-    - command: /demo-aggregate
-      description: Build baskets from this week's orders and post for approval
-    - command: /demo-checkin
-      description: Send Friday what-did-you-eat DMs
     - command: /demo-rescue
       description: Post the rescue board with one-tap claiming
-    - command: /demo-sweep
-      description: End-of-week waste sweep and leaderboard digest
     - command: /reset
       description: Sweep unclaimed food into waste (scored!) and wipe orders for a fresh week
 oauth_config:

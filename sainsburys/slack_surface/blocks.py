@@ -1,24 +1,5 @@
-# Block Kit builders — TODO
-def meal_picker_blocks(suggestions): raise NotImplementedError
-def basket_blocks(order):
-    """Block Kit message for one draft basket order with an Approve button."""
-    lines = order.get("lines", [])
-    total = sum(l["qty"] * l["unit_price"] for l in lines)
-    delivery = order["delivery_date"]
-    items_text = "\n".join(
-        "• %gx *%s* — £%.2f" % (l["qty"], l["name"], l["qty"] * l["unit_price"])
-        for l in lines
-    ) or "_No items_"
-    return [
-        {"type": "header", "text": {"type": "plain_text", "text": "🛒 Basket — %s" % delivery}},
-        {"type": "section", "text": {"type": "mrkdwn", "text": items_text}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": "*Total: £%.2f*" % total}]},
-        {"type": "actions", "elements": [
-            {"type": "button", "style": "primary",
-             "text": {"type": "plain_text", "text": "✅ Approve order"},
-             "action_id": "approve_order", "value": str(order["id"])},
-        ]},
-    ]
+# Block Kit builders
+def meal_picker_blocks(suggestions): raise NotImplementedError  # TODO
 
 
 def digest_blocks(digest):
@@ -137,28 +118,3 @@ def rescue_board_blocks(items):
         })
     return blocks
 
-
-def checkin_blocks(items):
-    """One section + Ate/Some/None button row per ordered item ({product_id, name, qty})."""
-    blocks = [
-        {"type": "header", "text": {"type": "plain_text", "text": "🍽️ Friday check-in"}},
-        {"type": "context", "elements": [{"type": "mrkdwn",
-            "text": "How did you get on with this week's food? One tap per item."}]},
-        {"type": "divider"},
-    ]
-    for item in items:
-        # value carries "product_id:qty_ordered" so the tap logs the right amount
-        value = "%s:%g" % (item["product_id"], item["qty"])
-        label = "*%s*" % item["name"]
-        if item["qty"] > 1:
-            label += "  ×%g" % item["qty"]
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": label}})
-        blocks.append({"type": "actions", "elements": [
-            {"type": "button", "style": "primary", "text": {"type": "plain_text", "text": "Ate it"},
-             "action_id": "checkin_ate", "value": value},
-            {"type": "button", "text": {"type": "plain_text", "text": "Some left"},
-             "action_id": "checkin_some", "value": value},
-            {"type": "button", "style": "danger", "text": {"type": "plain_text", "text": "Didn't touch"},
-             "action_id": "checkin_none", "value": value},
-        ]})
-    return blocks

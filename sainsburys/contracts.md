@@ -21,21 +21,15 @@ get_meals_db() -> list[Meal]
 get_user_prefs_db(user_slack_id) -> dict
 get_products_by_ids(ids) -> list[Product]
 
-# Check-in (implemented — /demo-checkin)
-# No delivery tracking: check-in works directly off each user's selections.
-users_with_selections(week) -> list[slack_id]
-open_items_for(user, week) -> list[{product_id, name, qty}]
-record_consumption(user, product_id, fraction) -> {product_id, name, qty, value}
-
-# Basket aggregation (implemented — future /demo-aggregate)
+# Basket aggregation (rebuilt automatically when a plan is accepted; feeds the dashboard)
 build_baskets(week) -> list[Order]        # Order includes "lines" [{product_id, name, qty, unit_price}]
-approve_order(order_id) -> Order
 
-# Rescue board (implemented — /demo-rescue; product-keyed, no lots)
+# Rescue board (implemented — /demo-rescue; product-keyed, no lots, no check-in gate:
+# everything ordered this week is board-eligible immediately)
 leftovers(week=None) -> list[{product_id, name, price, qty_left, days_left}]
 claim_product(product_id, user) -> {product_id, name, value, qty_left}
 
-# Sweep / reset / scoring (implemented — /demo-sweep, /reset)
+# Sweep / reset / scoring (implemented — /reset)
 sweep_waste(week=None) -> {wasted_items, wasted_value, by_user}  # waste attributed to orderers, claims prorated
 wipe_orders() -> None                    # clears selections/orders; events history survives
 leaderboard() -> [{slack_id, name, claimed, wasted, net}]  # net = claimed − wasted, desc
@@ -48,17 +42,17 @@ weekly_totals() -> list
 |---------------|------------------------|--------------------------|
 | /order        | handlers.order         | Unified flow: parse OR suggest → propose → Accept/Refine |
 | /suggest      | handlers.suggest       | Alias of /order          |
-| /demo-checkin | handlers.demo_checkin  | Send Friday check-in DMs |
 | /demo-rescue  | handlers.demo_rescue   | Post the rescue board    |
+| /reset        | handlers.reset         | Sweep waste (scored) + wipe orders + leaderboard |
 
 ## Button action_ids
 
-| action_id    | value      | handler                  |
-|--------------|------------|--------------------------|
-| checkin_ate  | product_id | handlers.on_checkin_ate  |
-| checkin_some | product_id | handlers.on_checkin_some |
-| checkin_none | product_id | handlers.on_checkin_none |
-| claim        | product_id | handlers.on_claim        |
+| action_id         | value        | handler                       |
+|-------------------|--------------|-------------------------------|
+| suggestion_accept | selection_id | handlers.on_suggestion_accept |
+| suggestion_refine | selection_id | handlers.on_suggestion_refine |
+| order_retry       | selection_id | handlers.on_order_retry       |
+| claim             | product_id   | handlers.on_claim             |
 
 ## Modal callback_ids
 

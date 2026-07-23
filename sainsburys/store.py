@@ -284,116 +284,13 @@ def build_baskets(week):
     return orders
 
 
-def approve_order(order_id):
-    """Transition draft → approved. Returns the Order."""
-    order = _q(
-        "update orders set status = 'approved' where id = ? and status = 'draft' "
-        "returning id, week, delivery_date, status",
-        (order_id,),
-        fetch="one",
-    )
-    if not order:
-        raise ValueError("order %s not found or not a draft" % order_id)
-    return order
-
-
-# ── Check-in / consumption ────────────────────────────────────────────────────
-
-def users_with_selections(week):
-    """Slack ids of everyone with a selection this week (who to DM for check-in)."""
-    rows = _q(
-        "select distinct user_slack_id from selections where week = ?",
-        (str(week),),
-        fetch="all",
-    ) or []
-    return [r["user_slack_id"] for r in rows]
-
-
-def open_items_for(user, week):
-    """
-    What the user ordered this week, straight from their selections
-    (meal picks expanded to products, freeform via the parsed plan).
-    Returns [{product_id, name, qty}] — the list the check-in DM shows.
-    """
-    selections = _q(
-        "select meal_id, parsed from selections "
-        "where user_slack_id = ? and week = ? and status not in ('void', 'proposed')",
-        (user, str(week)),
-        fetch="all",
-    ) or []
-
-    qty_by_product = {}
-    for sel in selections:
-        if sel["meal_id"]:
-            lines = _q(
-                "select product_id, qty from meal_products where meal_id = ?",
-                (sel["meal_id"],),
-                fetch="all",
-            ) or []
-        elif sel["parsed"]:
-            lines = json.loads(sel["parsed"]).get("product_lines", [])
-        else:
-            continue
-        for line in lines:
-            pid = line["product_id"]
-            qty_by_product[pid] = qty_by_product.get(pid, 0) + line["qty"]
-
-    items = []
-    for pid, qty in qty_by_product.items():
-        product = _q("select id, name from products where id = ?", (pid,), fetch="one")
-        if product:
-            items.append({"product_id": pid, "name": product["name"], "qty": qty})
-    return items
-
-
-def record_consumption(user, product_id, fraction, qty_ordered=1.0):
-    """
-    Log a Friday check-in answer: 'consumed' event for fraction of the user's
-    ordered quantity. fraction in [0, 1] (Ate=1, Some=0.5, None=0).
-    Events are append-only; readers take the LATEST answer per user+product.
-    Returns {product_id, name, qty, value}.
-    """
-    product = _q(
-        "select id, name, price from products where id = ?",
-        (product_id,),
-        fetch="one",
-    )
-    if not product:
-        raise ValueError("unknown product %s" % product_id)
-    qty = float(fraction) * float(qty_ordered)
-    value = round(qty * product["price"], 2)
-    _q(
-        "insert into events (kind, user_slack_id, product_id, qty, value) "
-        "values ('consumed', ?, ?, ?, ?)",
-        (user, product_id, qty, value),
-    )
-    return {"product_id": product_id, "name": product["name"], "qty": qty, "value": value}
-
-
-def user_week_summary(user, week):
-    """£ ordered vs £ eaten (latest answer per product) — for the check-in wrap-up."""
-    items = open_items_for(user, week)
-    prices = {p["id"]: p["price"] for p in get_products_by_ids([i["product_id"] for i in items])}
-    ordered_value = round(sum(i["qty"] * float(prices.get(i["product_id"], 0)) for i in items), 2)
-    row = _q(
-        "select sum(value) as eaten from ("
-        "  select value, row_number() over (partition by product_id order by ts desc, id desc) as rn"
-        "  from events where kind = 'consumed' and user_slack_id = ? and date(ts) >= ?"
-        ") where rn = 1",
-        (user, str(week)),
-        fetch="one",
-    )
-    return {"ordered_value": ordered_value, "eaten_value": round(row["eaten"] or 0, 2)}
-
-
 # ── Rescue board ──────────────────────────────────────────────────────────────
 
 def leftovers(week=None):
     """
-    What's left in the fridge, per product. An ordered item only counts here once
-    its owner has CHECKED IN for it (a 'consumed' event exists for that user+product
-    this week) — before check-in it's still in the basket, not the rescue bin. Then
-    qty_left = ordered - latest consumed, minus any 'claimed'/'wasted'. days_left is
+    What's left in the fridge, per product: everything ordered this week goes
+    straight on the board (check-in was removed from the flow), minus any
+    'consumed' events that may exist, minus 'claimed'/'wasted'. days_left is
     estimated from the half's delivery day (Mon/Wed) + the product's shelf life.
     Returns [{product_id, name, price, qty_left, days_left}].
     """
@@ -441,9 +338,8 @@ def leftovers(week=None):
                     meta[pid] = {"name": product["name"], "price": product["price"],
                                  "days_left": days_left}
 
-    # Consumed: the LATEST check-in answer per user+product (repeat taps correct,
-    # not accumulate). Its presence for a (user, product) is the "checked in" signal:
-    # an ordered item only becomes a leftover once its owner has checked in.
+    # Consumed events (latest per user+product) still subtract if any exist,
+    # but they are no longer a gate — ordered items are board-eligible at once.
     consumed = _q(
         "select user_slack_id, product_id, qty from ("
         "  select user_slack_id, product_id, qty, row_number() over ("
@@ -457,9 +353,7 @@ def leftovers(week=None):
 
     out = {}
     for (user, pid), qty in ordered.items():
-        if (user, pid) not in consumed_by:
-            continue  # not checked in yet — still in the basket, not the bin
-        left = qty - consumed_by[(user, pid)]
+        left = qty - consumed_by.get((user, pid), 0)
         if pid in out:
             out[pid]["qty_left"] += left
         else:
@@ -555,10 +449,9 @@ def _ordered_by_user(week=None):
 
 def sweep_waste(week=None):
     """
-    End-of-week sweep (the /reset moment): everything ordered but not eaten and
-    not claimed is logged as 'wasted' — ATTRIBUTED to whoever ordered it, so
-    wasters lose leaderboard points. Not checking in doesn't dodge the score:
-    with no check-in the whole ordered qty counts as unconsumed.
+    End-of-week sweep (the /reset moment): everything ordered but not claimed
+    is logged as 'wasted' — ATTRIBUTED to whoever ordered it, so wasters lose
+    leaderboard points.
 
     Claims are product-level (anyone can rescue anyone's food), so each
     product's claimed qty reduces its orderers' waste proportionally.

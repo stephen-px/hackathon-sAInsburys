@@ -1,6 +1,5 @@
 import store
 from flows import basket, rescue
-from flows.basket import _current_week
 
 
 def register(app):
@@ -57,44 +56,6 @@ def register(app):
         ack()
         basket.handle_refine_submit(body, client)
 
-    # ── /demo-aggregate (build baskets + post Approve buttons) ──────────────────
-
-    @app.command("/demo-aggregate")
-    def demo_aggregate(ack, respond, client, body):
-        ack()
-        channel = body["channel_id"]
-
-        def _go():
-            from slack_surface import blocks as blk
-            week = _current_week()
-            orders = store.build_baskets(week)
-            if not orders:
-                respond({"text": "No pending selections to aggregate this week.",
-                         "response_type": "ephemeral", "replace_original": False})
-                return
-            for order in orders:
-                client.chat_postMessage(
-                    channel=channel,
-                    text="Basket ready for %s" % order["delivery_date"],
-                    blocks=blk.basket_blocks(order),
-                )
-            respond({"text": "Posted %d basket(s) for approval." % len(orders),
-                     "response_type": "ephemeral", "replace_original": False})
-
-        _run(respond, _go)
-
-    @app.action("approve_order")
-    def on_approve_order(ack, respond, body):
-        ack()
-
-        def _go():
-            order_id = int(body["actions"][0]["value"])
-            order = store.approve_order(order_id)
-            respond({"text": "✅ Basket for *%s* approved!" % order["delivery_date"],
-                     "response_type": "in_channel", "replace_original": False})
-
-        _run(respond, _go)
-
     # ── Order confirmation DM buttons ────────────────────────────────────────────
 
     @app.action("order_confirm")
@@ -131,34 +92,6 @@ def register(app):
 
         _run(respond, _go)
 
-    # ── /demo-checkin (mirrors the real Fri 09:30 trigger) ──────────────────────
-
-    @app.command("/demo-checkin")
-    def demo_checkin(ack, respond, client):
-        ack()
-
-        def _go():
-            sent = rescue.send_checkin_dms(client)
-            respond({"text": "📬 Check-in DMs sent to %d user(s)." % sent,
-                     "response_type": "ephemeral", "replace_original": False})
-
-        _run(respond, _go)
-
-    @app.action("checkin_ate")
-    def on_checkin_ate(ack, respond, body, client):
-        ack()
-        _run(respond, lambda: _record_checkin(respond, body, client, fraction=1.0))
-
-    @app.action("checkin_some")
-    def on_checkin_some(ack, respond, body, client):
-        ack()
-        _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.5))
-
-    @app.action("checkin_none")
-    def on_checkin_none(ack, respond, body, client):
-        ack()
-        _run(respond, lambda: _record_checkin(respond, body, client, fraction=0.0))
-
     # ── /reset (end-of-week sweep: waste logged & scored, orders wiped) ─────────
 
     @app.command("/reset")
@@ -176,6 +109,15 @@ def register(app):
                 text="🗑️ Weekly sweep: £%.2f wasted. Fresh week started." % digest["wasted_value"],
                 blocks=blk.digest_blocks(digest),
             )
+            board = store.leaderboard()
+            if board:
+                lb_text = "\n".join(
+                    "%s. *%s* — £%.2f net (£%.2f saved / £%.2f wasted)" % (
+                        i + 1, row["name"], row["net"], row["claimed"], row["wasted"])
+                    for i, row in enumerate(board[:5])
+                )
+                client.chat_postMessage(channel=body["channel_id"],
+                                        text="🏆 *Leaderboard:*\n" + lb_text)
 
         _run(respond, _go)
 
@@ -220,36 +162,6 @@ def register(app):
 
         _run(respond, _claim)
 
-    # ── /demo-sweep (end-of-week waste sweep + digest) ────────────────────────────
-
-    @app.command("/demo-sweep")
-    def demo_sweep(ack, respond, client, body):
-        ack()
-        channel = body["channel_id"]
-
-        def _go():
-            from slack_surface import blocks as blk
-            week = _current_week()
-            digest = store.sweep_waste(week)
-            client.chat_postMessage(
-                channel=channel,
-                text="🗑️ Weekly waste sweep",
-                blocks=blk.digest_blocks(digest),
-            )
-            board = store.leaderboard()
-            if board:
-                lb_text = "\n".join(
-                    "%s. *%s* — £%.2f saved" % (i + 1, row["name"], row["saved"])
-                    for i, row in enumerate(board[:5])
-                )
-                client.chat_postMessage(channel=channel,
-                                        text="🏆 *Rescue leaderboard:*\n" + lb_text)
-            respond({"text": "Sweep done.",
-                     "response_type": "ephemeral", "replace_original": False})
-
-        _run(respond, _go)
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _run(respond, thunk):
@@ -283,37 +195,6 @@ def _replace_actions(respond, body, note, value=None):
             new_blocks.append(block)
     respond({"blocks": new_blocks, "text": note, "replace_original": True})
     return new_blocks
-
-
-def _record_checkin(respond, body, client, fraction):
-    raw = body["actions"][0]["value"]          # "product_id:qty" (older DMs: just id)
-    product_id, _, qty_str = raw.partition(":")
-    product_id, qty_ordered = int(product_id), float(qty_str or 1)
-    user = body["user"]["id"]
-    try:
-        result = store.record_consumption(user, product_id, fraction, qty_ordered)
-    except ValueError:
-        # Stale DM: sent before a reset/refactor, or by a bot instance with a
-        # different local lunch.db — its button ids don't resolve here.
-        respond({"text": "🤔 That button is from an older check-in and I can't match "
-                         "it any more. Run `/demo-checkin` for a fresh one.",
-                 "response_type": "ephemeral", "replace_original": False})
-        return
-
-    label = {1.0: "✅ Ate it", 0.5: "🥡 Some left", 0.0: "🙈 Didn't touch"}[fraction]
-    new_blocks = _replace_actions(respond, body, "%s — *%s*" % (label, result["name"]), value=raw)
-
-    # All items answered? Post the weekly wrap-up.
-    if not any(b.get("type") == "actions" for b in new_blocks):
-        from flows.basket import _current_week
-        summary = store.user_week_summary(user, _current_week())
-        client.chat_postMessage(
-            channel=_channel_id(body),
-            thread_ts=body["message"]["ts"],
-            text="🧾 All done! You ate *£%.2f* of your *£%.2f* order this week. "
-                 "Whatever's left goes on the rescue board 🛟" % (
-                summary["eaten_value"], summary["ordered_value"]),
-        )
 
 
 def _refine_modal(selection_id):

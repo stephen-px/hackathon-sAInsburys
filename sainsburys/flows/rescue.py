@@ -1,26 +1,9 @@
 import store
-from flows.basket import _current_week
 from slack_surface import blocks
 
 
-def send_checkin_dms(client):
-    """DM each user their ordered items for the week + Ate/Some/None buttons."""
-    week = _current_week()
-    sent = 0
-    for user in store.users_with_selections(week):
-        items = store.open_items_for(user, week)
-        if not items:
-            continue
-        dm = client.conversations_open(users=user)
-        client.chat_postMessage(channel=dm["channel"]["id"],
-                                text="Friday check-in — how did you get on?",
-                                blocks=blocks.checkin_blocks(items))
-        sent += 1
-    return sent
-
-
 def _risk(item):
-    """Deterministic expiry-risk score (see CLAUDE.md) — no LLM here."""
+    """Deterministic expiry-risk score — no LLM here."""
     return (3.0 / (max(item["days_left"], 0) + 0.5)
             + 0.2 * float(item["price"])
             + 0.1 * float(item["qty_left"]))
@@ -43,7 +26,3 @@ def post_board(client, channel):
                             text="🛟 Rescue board — claim it before it's binned",
                             blocks=board)
     # Personalised top-3 DMs (agents/personaliser.py, Track B) plug in here.
-
-
-# TODO
-def sweep_and_digest(client, channel): raise NotImplementedError
