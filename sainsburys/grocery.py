@@ -12,6 +12,7 @@ One-time setup (interactive, SMS 2FA):
 """
 import json
 import os
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -32,6 +33,15 @@ class NotConnected(Exception):
     """No usable Sainsbury's session — run the uk-grocery-cli login."""
 
 
+# Cookies Sainsbury's rotates on every response (WebSphere Commerce refreshes
+# WC_AUTHENTICATION on authenticated writes; Akamai rotates _abck/bm_*). If we
+# keep sending the login-instant snapshot the server ages the session out fast
+# — often after the first write. So we absorb every Set-Cookie back into the
+# session file and rebuild the request from the live values each call.
+_io_lock = threading.Lock()
+_SESSION_TTL_DAYS = 7
+
+
 def _load_session():
     if not SESSION_FILE.exists():
         raise NotConnected("no session file at %s" % SESSION_FILE)
@@ -42,9 +52,42 @@ def _load_session():
     return data
 
 
+def _absorb(resp):
+    """Merge a response's Set-Cookie rotations back into the session file so
+    the next request uses the server's freshest tokens. Keeps the session
+    alive across writes instead of dying on the first token rotation."""
+    jar = getattr(resp, "cookies", None)
+    if not jar or len(jar) == 0:
+        return resp
+    with _io_lock:
+        try:
+            data = json.loads(SESSION_FILE.read_text())
+        except (OSError, ValueError):
+            return resp   # no file to update (e.g. anon run) — nothing to persist
+        by_name = {c["name"]: c for c in data.get("cookies", [])}
+        changed = False
+        for c in jar:
+            if by_name.get(c.name, {}).get("value") != c.value:
+                by_name.setdefault(c.name, {"name": c.name})["value"] = c.value
+                changed = True
+        if changed:
+            data["cookies"] = list(by_name.values())
+            # Push the local guard forward while the session is actively used;
+            # real staleness is decided by the server (_check_alive), not this.
+            data["expiresAt"] = (datetime.now(timezone.utc)
+                                 + timedelta(days=_SESSION_TTL_DAYS)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            tmp = SESSION_FILE.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(data))
+            tmp.replace(SESSION_FILE)   # atomic — never leave a half-written session
+    return resp
+
+
 def _client(require_session=True):
     """HTTP client. Search works anonymously; basket writes need the real
     account session so the trolley shows up in the user's browser.
+
+    Cookies are rebuilt from the session file on every call, so rotations
+    absorbed by _absorb() take effect immediately.
 
     GROCERY_ANON=1 forces anonymous requests even when a session exists —
     bulk jobs (the catalogue backfill) must never run on the real account."""
@@ -62,8 +105,19 @@ def _client(require_session=True):
     s.headers["Cookie"] = "; ".join("%s=%s" % (c["name"], c["value"]) for c in cookies)
     auth = next((c for c in cookies if c["name"].startswith("WC_AUTHENTICATION_")), None)
     if auth:
-        s.headers["wcauthtoken"] = auth["value"]
+        s.headers["wcauthtoken"] = auth["value"]   # must track the live cookie, not the login one
     return s
+
+
+def _check_alive(resp):
+    """Server-truth staleness check. The local expiresAt is a guess — the real
+    signal is the API kicking us out: 401/403, or HTML (a login redirect)
+    where JSON should be."""
+    if resp.status_code in (401, 403):
+        raise NotConnected("session rejected by Sainsbury's (%d) — needs re-auth" % resp.status_code)
+    if resp.ok and "text/html" in resp.headers.get("Content-Type", ""):
+        raise NotConnected("got a login page instead of JSON — needs re-auth")
+    return resp
 
 
 def _pick_time():
@@ -131,13 +185,13 @@ def search(query, limit=8):
 
 
 def add_to_basket(product_uid, qty):
-    resp = _client().post(
+    resp = _check_alive(_absorb(_client().post(
         API_BASE + "/basket/v2/basket/item",
         params=_basket_params(),
         json={"product_uid": str(product_uid), "quantity": int(qty),
               "uom": "ea", "selected_catchweight": ""},
         timeout=20,
-    )
+    )))
     if resp.status_code >= 400:
         raise RuntimeError("add_to_basket %s x%s failed: %s %s"
                            % (product_uid, qty, resp.status_code, resp.text[:200]))
@@ -145,8 +199,8 @@ def add_to_basket(product_uid, qty):
 
 def get_basket():
     """Current trolley: {items: [...], item_count, total}."""
-    resp = _client().get(API_BASE + "/basket/v2/basket",
-                         params=_basket_params(), timeout=20)
+    resp = _check_alive(_absorb(_client().get(API_BASE + "/basket/v2/basket",
+                                              params=_basket_params(), timeout=20)))
     resp.raise_for_status()
     data = resp.json()
     return {
