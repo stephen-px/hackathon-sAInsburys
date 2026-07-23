@@ -21,17 +21,31 @@ def _format_lines(product_lines, products):
     return "\n".join(lines)
 
 
-def _send_plan(client, dm_channel, selection_id, result, request_text):
-    """DM the proposed plan with Order it / Change something buttons."""
+def _send_plan(client, dm_channel, selection_id, result, request_text, ordered=False):
+    """DM the plan. Proposed → Order it / Change; ordered → amendable Change."""
     product_ids = [line["product_id"] for line in result.get("product_lines", [])]
     products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
     lines_text = _format_lines(result.get("product_lines", []), products)
     client.chat_postMessage(
         channel=dm_channel,
-        text="Proposed lunch: %s" % (result.get("notes") or lines_text),
+        text="%s: %s" % ("Your order" if ordered else "Proposed lunch",
+                         result.get("notes") or lines_text),
         blocks=blocks.suggestion_blocks(selection_id, lines_text,
-                                        result.get("notes") or "", request_text),
+                                        result.get("notes") or "", request_text,
+                                        ordered=ordered),
     )
+
+
+def plan_view_blocks(selection_id, ordered):
+    """Rebuild the plan DM blocks for an existing selection (used on Accept)."""
+    sel = store.get_selection(selection_id)
+    parsed = json.loads(sel["parsed"]) if sel and sel["parsed"] else {}
+    product_ids = [line["product_id"] for line in parsed.get("product_lines", [])]
+    products = {p["id"]: p for p in store.get_products_by_ids(product_ids)}
+    lines_text = _format_lines(parsed.get("product_lines", []), products)
+    return blocks.suggestion_blocks(selection_id, lines_text,
+                                    parsed.get("notes") or "",
+                                    sel["freeform"] if sel else "", ordered=ordered)
 
 
 def handle_order_submit(body, client):
@@ -44,7 +58,8 @@ def handle_order_submit(body, client):
     user_name = body["user"].get("username", body["user"].get("name", user_id))
     values = body["view"]["state"]["values"]
     order_text = (values["order_text"]["text"].get("value") or "").strip()
-    half = values["order_half"]["half"]["selected_option"]["value"]
+    # Delivery halves were dropped from the UX — everything is one weekly basket.
+    half = "early"
     week = _current_week()
 
     store.ensure_user(user_id, user_name)
@@ -96,13 +111,18 @@ def handle_refine_submit(body, client):
     dm_channel = dm["channel"]["id"]
 
     sel = store.get_selection(selection_id)
-    if not sel or sel["status"] != "proposed":
+    if not sel or sel["status"] == "void":
         client.chat_postMessage(channel=dm_channel,
                                 text="🤔 That plan is gone — run /order again.")
         return
 
+    # Amending an already-placed order keeps it placed; a proposal stays a proposal.
+    ordered = sel["status"] != "proposed"
+    keep_status = "proposed" if not ordered else \
+        ("pending" if sel["status"] == "ordered" else sel["status"])
+
     client.chat_postMessage(channel=dm_channel, text=":bulb: Reworking it...")
-    print("[plan] refine id=%s feedback=%r" % (selection_id, feedback), flush=True)
+    print("[plan] refine id=%s ordered=%s feedback=%r" % (selection_id, ordered, feedback), flush=True)
     try:
         previous = json.loads(sel["parsed"]) if sel["parsed"] else None
         result = concierge.plan(user_id, sel["freeform"], sel["half"],
@@ -110,8 +130,10 @@ def handle_refine_submit(body, client):
         if result.get("rejected"):
             client.chat_postMessage(channel=dm_channel, text=":no_good: %s" % result["rejected"])
             return
-        store.update_selection_parsed(selection_id, result, status="proposed")
-        _send_plan(client, dm_channel, selection_id, result, sel["freeform"])
+        store.update_selection_parsed(selection_id, result, status=keep_status)
+        if ordered:
+            on_plan_accepted()   # order changed — refresh draft baskets for the dashboard
+        _send_plan(client, dm_channel, selection_id, result, sel["freeform"], ordered=ordered)
     except Exception as e:
         client.chat_postMessage(
             channel=dm_channel,
@@ -156,10 +178,6 @@ def prefilled_order_modal(selection_id):
     modal = _order_modal()
     if sel:
         modal["blocks"][0]["element"]["initial_value"] = sel["freeform"] or ""
-        half = sel["half"] or "early"
-        label = "Early week (Mon)" if half == "early" else "Late week (Wed)"
-        modal["blocks"][1]["element"]["initial_option"] = {
-            "text": {"type": "plain_text", "text": label}, "value": half}
     return modal
 
 

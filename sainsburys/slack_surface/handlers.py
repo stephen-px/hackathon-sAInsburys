@@ -31,9 +31,13 @@ def register(app):
         ack()
 
         def _go():
-            store.accept_selection(int(body["actions"][0]["value"]))
+            selection_id = int(body["actions"][0]["value"])
+            store.accept_selection(selection_id)
             basket.on_plan_accepted()
-            _replace_actions(respond, body, "✅ Ordered — it'll be in this week's basket!")
+            # Swap to the ordered view — the plan stays amendable via Change something
+            respond({"blocks": basket.plan_view_blocks(selection_id, ordered=True),
+                     "text": "✅ Ordered — you can still change it.",
+                     "replace_original": True})
 
         _run(respond, _go)
 
@@ -336,19 +340,6 @@ def _order_modal():
                         "type": "plain_text",
                         "text": "An exact order, a mood (“something light”), or leave blank and I'll pick",
                     },
-                },
-            },
-            {
-                "type": "input",
-                "block_id": "order_half",
-                "label": {"type": "plain_text", "text": "Delivery"},
-                "element": {
-                    "type": "static_select",
-                    "action_id": "half",
-                    "options": [
-                        {"text": {"type": "plain_text", "text": "Early week (Mon)"}, "value": "early"},
-                        {"text": {"type": "plain_text", "text": "Late week (Wed)"}, "value": "late"},
-                    ],
                 },
             },
         ],
